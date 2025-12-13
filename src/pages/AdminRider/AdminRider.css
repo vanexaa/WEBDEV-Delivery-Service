@@ -1,0 +1,322 @@
+#root {
+  width: 100%;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* =========================================
+   1. GLOBAL SETUP & FONTS
+   ========================================= */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,100..1000;1,100..1000&display=swap');
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', sans-serif;
+  background: #f5f5f5; /* Light grey background */
+  color: #333;         /* Dark text (Fixes the invisible text issue) */
+}
+
+/* The main container that centers everything */
+.app {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;       /* Adds padding so it doesn't touch edges on mobile */
+  box-sizing: border-box; 
+}
+
+/* =========================================
+   2. DASHBOARD VIEW STYLES
+   ========================================= */
+.logo {
+  font-size: 36px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #4a3b2a;
+  text-align: center;
+}
+
+.card {
+  background: #fffdf8;
+  border-radius: 60px;
+  padding: 30px 40px;
+  
+  /* RESPONSIVE SIZE FIX */
+  width: 90%;          /* Fluid width for small screens */
+  max-width: 500px;    /* Stops growing at 500px */
+  
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  text-align: center;
+  margin-bottom: 25px;
+  color: #333;
+}
+
+.stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap; /* Allows stacking on very small phones */
+}
+
+.stat {
+  text-align: center;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120px; /* Prevents squishing */
+}
+
+.avatar {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: #d9dde3;
+  margin-bottom: 10px;
+}
+
+button {
+  margin-top: 10px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 20px;
+  background: #b9793b;
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+button:hover {
+  background: #a5672f;
+}
+
+/* =========================================
+   3. RIDER LIST VIEW STYLES
+   ========================================= */
+.rider-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  
+  /* RESPONSIVE SIZE FIX */
+  width: 100%;        
+  max-width: 600px;    
+}
+
+.back-btn {
+  align-self: flex-start;
+  font-size: 40px;
+  color: #b9793b;
+  cursor: pointer;
+  margin-bottom: 10px;
+  font-weight: bold;
+  margin-left: 10px;
+}
+
+.tabs {
+  background: #f1f1f1;
+  border-radius: 30px;
+  padding: 5px;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tab {
+  padding: 10px 20px;
+  border-radius: 25px;
+  cursor: pointer;
+  color: #555;
+  font-weight: 500;
+  text-align: center;
+}
+
+.tab.active {
+  font-weight: bold;
+  color: #000;
+  background: white; /* Optional: highlights active tab */
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.list-card {
+  background: white;
+  
+  /* RESPONSIVE SIZE FIX */
+  width: 100%;
+  box-sizing: border-box; /* Ensures padding doesn't break width */
+  
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  border: 1px solid #eee;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 10px;
+  margin-bottom: 15px;
+  font-weight: bold;
+  color: #333;
+}
+
+.rider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f9f9f9; /* Subtle separator */
+}
+
+.rider-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.avatar-small {
+  width: 40px;
+  height: 40px;
+  background: #dfe2e6;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rider-name {
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.rider-name:hover {
+  text-decoration: underline;
+  color: #b9793b;
+}
+
+.status-select select {
+  background-color: #b9793b;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  outline: none;
+  font-size: 14px;
+}
+
+/* =========================================
+   4. POPUP / MODAL STYLES
+   ========================================= */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(5px);      /* Blurs the background */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px; /* Prevents edge touching on mobile */
+  box-sizing: border-box;
+}
+
+.modal-content {
+  background: #f8f9fa;
+  
+  /* RESPONSIVE SIZE FIX */
+  width: 90%;
+  max-width: 400px;
+  
+  padding: 30px;
+  border-radius: 20px;
+  position: relative;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  border: 1px solid #ddd;
+}
+
+.close-btn {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  background: transparent;
+  color: #b9793b;
+  font-size: 24px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+
+.modal-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h2 {
+  margin: 10px 0 5px 0;
+  color: #333;
+}
+
+.rider-id {
+  color: #666;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.avatar-large {
+  width: 80px;
+  height: 80px;
+  background: #d9dde3;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.modal-body {
+  text-align: left;
+  padding: 0 10px;
+}
+
+.info-section {
+  margin-bottom: 15px;
+}
+
+.info-section h3 {
+  font-size: 14px;
+  color: #444;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-section p {
+  margin: 2px 0;
+  font-size: 15px;
+  color: #222;
+  font-weight: 500;
+  padding-left: 10px;
+}
