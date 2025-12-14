@@ -17,7 +17,7 @@ function App() {
   const [otherReason, setOtherReason] = useState("");
 
   // Data for the riders
-  const riders = [
+  const [riders, setRiders] = useState([
     {
       id: 1,
       name: "Jane Doe",
@@ -42,7 +42,7 @@ function App() {
       vehicle: "Bicycle",
       plate: "N/A",
     },
-  ];
+  ]);
 
   // Sample delivery data
   const deliveries = [
@@ -173,6 +173,26 @@ function App() {
       other: false,
     });
     setOtherReason("");
+  };
+
+const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file && selectedRider) {
+      const reader = new FileReader();
+      
+      reader.onloadend = () => {
+        const newImage = reader.result;
+      
+        const updatedRiders = riders.map((r) => 
+          r.id === selectedRider.id ? { ...r, profilePic: newImage } : r
+        );
+        setRiders(updatedRiders);
+
+        setSelectedRider((prev) => ({ ...prev, profilePic: newImage }));
+      };
+      
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -345,7 +365,7 @@ function App() {
         </div>
       )}
 
-      {/* === RIDER POPUP MODAL === */}
+  {/* === RIDER POPUP MODAL === */}
       {selectedRider && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -357,15 +377,42 @@ function App() {
             </button>
 
             <div className="modal-header">
-              <div className="avatar-large">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="#364152">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                </svg>
+              {/* === AVATAR UPLOAD SECTION === */}
+              <div className="avatar-upload-container">
+                <label htmlFor="photo-upload" className="avatar-wrapper">
+                  {/* Show uploaded image OR the default icon */}
+                  {selectedRider.profilePic ? (
+                    <img src={selectedRider.profilePic} alt="Rider" className="avatar-image" />
+                  ) : (
+                    <div className="avatar-placeholder">
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="#364152">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                      </svg>
+                    </div>
+                  )}
+                  
+                  {/* Hover Overlay */}
+                  <div className="avatar-overlay">
+                    <span>Change</span>
+                  </div>
+                </label>
+                
+                {/* Hidden Input */}
+                <input 
+                  id="photo-upload" 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageUpload} 
+                  style={{ display: "none" }} 
+                />
               </div>
+              {/* === END AVATAR SECTION === */}
+
               <h2>{selectedRider.name}</h2>
               <p className="rider-id">Rider ID: {selectedRider.riderId}</p>
             </div>
 
+            {/* === YOU WERE MISSING THIS BODY SECTION === */}
             <div className="modal-body">
               <div className="info-section">
                 <h3>Contact Info:</h3>
@@ -385,6 +432,8 @@ function App() {
                 <p>- Plate: {selectedRider.plate}</p>
               </div>
             </div>
+            {/* === END OF MISSING BODY SECTION === */}
+
           </div>
         </div>
       )}
