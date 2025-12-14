@@ -42,7 +42,7 @@ body {
 
 .card {
   background: #fffdf8;
-  border-radius: 60px;
+  border-radius: 24px !important;
   padding: 30px 40px;
   
   /* RESPONSIVE SIZE FIX */
@@ -88,7 +88,7 @@ button {
   margin-top: 10px;
   padding: 8px 16px;
   border: none;
-  border-radius: 20px;
+  border-radius: 20px !important;
   background: #b9793b;
   color: white;
   cursor: pointer;
@@ -146,7 +146,7 @@ button:hover {
 .tab.active {
   font-weight: bold;
   color: #000;
-  background: white; /* Optional: highlights active tab */
+  background: white;
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
@@ -241,14 +241,13 @@ button:hover {
 }
 
 .modal-content {
-  background: #f8f9fa;
+  background: #f8f9fa !important;
   
-  /* RESPONSIVE SIZE FIX */
   width: 90%;
   max-width: 400px;
   
   padding: 30px;
-  border-radius: 20px;
+  border-radius: 20px !important;
   position: relative;
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
   border: 1px solid #ddd;
@@ -259,13 +258,19 @@ button:hover {
   top: 15px;
   left: 15px;
   background: transparent;
-  color: #b9793b;
+  color: #b9793b !important;
   font-size: 24px;
   font-weight: bold;
   border: none;
   cursor: pointer;
   padding: 0;
   margin: 0;
+}
+
+.close-btn:hover {
+  background: transparent;
+  color: #8B6F47;          
+  box-shadow: none;       
 }
 
 .modal-header {
@@ -322,7 +327,7 @@ button:hover {
   padding-left: 10px;
 }
 
-* Delivery Table Styles */
+/* Delivery Table Styles */
 .delivery-table-container {
   padding: 20px;
   overflow-x: auto;

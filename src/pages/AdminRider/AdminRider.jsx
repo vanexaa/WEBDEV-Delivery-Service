@@ -209,12 +209,24 @@ function App() {
           <div className="back-btn" onClick={() => setCurrentView("dashboard")}>
             &laquo;
           </div>
-
-          <div className="tabs">
-            <span className="tab active">Rider's List</span>
-            <span className="tab">On-Going deliveries</span>
-          </div>
-
+<div className="tabs">
+      {/* This is the active tab, clicking it keeps us here */}
+      <span 
+        className="tab active" 
+        onClick={() => setCurrentView("riders")}
+      >
+        Rider's List
+      </span>
+      
+      {/* This is the INACTIVE tab. Clicking it switches to 'deliveries' */}
+      <span 
+        className="tab" 
+        onClick={() => setCurrentView("deliveries")}
+        style={{ cursor: "pointer" }} /* Optional: ensures hand cursor shows */
+      >
+        On-Going deliveries
+      </span>
+    </div>
           <div className="list-card">
             <div className="list-header">
               <span>Rider name</span>
@@ -265,12 +277,24 @@ function App() {
           <div className="back-btn" onClick={() => setCurrentView("dashboard")}>
             &laquo;
           </div>
+<div className="tabs">
+      {/* This is the INACTIVE tab. Clicking it switches to 'riders' */}
+      <span 
+        className="tab" 
+        onClick={() => setCurrentView("riders")}
+        style={{ cursor: "pointer" }}
+      >
+        Rider's List
+      </span>
 
-          <div className="tabs">
-            <span className="tab">Rider's List</span>
-            <span className="tab active">On-Going Deliveries</span>
-          </div>
-
+      {/* This is the active tab */}
+      <span 
+        className="tab active" 
+        onClick={() => setCurrentView("deliveries")}
+      >
+        On-Going Deliveries
+      </span>
+    </div>
           <div className="list-card delivery-table-container">
             <h2 style={{ marginBottom: "20px", color: "#364152" }}>
               Delivery Management
