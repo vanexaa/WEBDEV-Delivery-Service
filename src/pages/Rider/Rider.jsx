@@ -4,86 +4,133 @@ import './Rider.css';
 const getStatusClass = (status) => {
     switch (status) {
         case "Picked Up":
-            return "status-picked-up";
+            return "status-preparing";
         case "In transit":
             return "status-transit";
         case "Delivered":
             return "status-delivered";
         case "Failed":
-            return "status-failed";
+            return "status-pending";
         default:
             return "status-default";
     }
 };
 
-const OrderDetailsPopup = ({ order, onAccept, onDecline }) => {
+const QueuedOrderPopup = ({ order, onAccept, onDecline, onClose }) => {
   if (!order) return null;
 
   const formattedItems = order.items; 
 
   return (
-    <div className="modal-content order-details-popup-card">
-        <div className="modal-header">
-            <h3 className="popup-order-number">Order #{order.id}</h3>
-            <button className="view-map-button">View Map</button>
-        </div>
+    <div className="modal-overlay">
+        <div className="modal-content order-details-popup-card">
+            <div className="modal-header">
+                <h3 className="popup-order-number">Order #{order.id}</h3>
+                <span className="view-order-link">View Map</span>
+                <button className="close-btn" onClick={onClose}>✖</button>
+            </div>
 
-        <div className="modal-body popup-details-text">
-            <p>Customer Name: **{order.customerName}**</p>
-            <p>Delivery Address: {order.deliveryAddress}</p>
-            <p>Delivery Notes: {order.deliveryNotes || 'N/A'}</p>
-            <p>Items: {formattedItems}</p>
-        </div>
+            <div className="modal-body popup-details-text">
+                <p>Customer Name: **{order.customerName}**</p>
+                <p>Delivery Address: {order.deliveryAddress}</p>
+                <p>Delivery Notes: {order.deliveryNotes || 'N/A'}</p>
+                <p>Items: {formattedItems}</p>
+            </div>
 
-        <div className="modal-footer d-flex justify-content-center">
-            <button
-                className="decline-button reason-btn failed-btn me-3"
-                onClick={() => onDecline(order)}
-            >
-                Decline
-            </button>
-            <button
-                className="accept-button reason-btn confirm-btn"
-                onClick={() => onAccept(order)}
-            >
-                Accept
-            </button>
+            <div className="modal-footer action-buttons justify-content-center">
+                <button
+                    className="action-btn failed-btn"
+                    onClick={() => { onDecline(order); onClose(); }}
+                >
+                    Decline
+                </button>
+                <button
+                    className="action-btn delivered-btn"
+                    onClick={() => { onAccept(order); onClose(); }}
+                >
+                    Accept
+                </button>
+            </div>
         </div>
     </div>
   );
 };
 
 
+const AssignedOrderPopup = ({ order, onDelivered, onStatusChange, onClose }) => {
+    if (!order) return null;
+
+    const StatusDropdown = ({ currentStatus }) => (
+        <div className="status-dropdown-group">
+            <label className="status-label">Update Status:</label>
+            <select
+                className="status-select"
+                value={currentStatus}
+                onChange={(e) => onStatusChange(order.id, e.target.value)}
+            >
+                <option>Picked Up</option>
+                <option>In transit</option>
+                <option>Delivered</option>
+                <option>Failed</option>
+            </select>
+        </div>
+    );
+
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content right-details-modal">
+                <button className="close-btn" onClick={onClose}>✖</button>
+
+                <div className="modal-header">
+                    <h2 className="details-header">Order Details</h2>
+                    <div className="order-status-line">
+                        <span className="order-id-display">Order #{order.id}</span>
+                    </div>
+                </div>
+
+                <div className="modal-body">
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                        <StatusDropdown currentStatus={order.status} />
+                    </div>
+
+                    <div className="status-text mb-3 info-section">
+                        Status: <span className={`status-badge ${getStatusClass(order.status)}`}>
+                            {order.status}
+                        </span>
+                    </div>
+                    
+                    <div className="customer-info-box info-section">
+                        <h3>Customer Info:</h3>
+                        <p>Name: {order.customerName}</p>
+                        <p>Address: {order.deliveryAddress}</p>
+                        <p>Contact #: {order.customerPhone}</p>
+                    </div>
+
+                    <p className="payment-method-text mb-4">Payment Method: {order.paymentMethod}</p>
+
+                    <div className="mock-map-right-details">
+                    </div>
+
+                    <button
+                        className="order-delivered-button action-btn delivered-btn"
+                        onClick={() => { onDelivered(order.id); onClose(); }}
+                    >
+                        Order Delivered
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 const initialQueuedOrders = [
-  {
-    id: '123123',
-    customerName: 'Boss Oleg',
-    deliveryAddress: '322 kanto nila fitz',
-    deliveryNotes: '(if any)',
-    items: '1x Barako, 1x 3-in-1',
-    paymentMethod: 'Cash on Delivery',
-  },
-  {
-    id: '696969',
-    customerName: 'Pedro Reyes',
-    deliveryAddress: 'Block 12 Lot 3, Rizal Province',
-    deliveryNotes: '',
-    items: '1x Americano, 1x Cappuccino',
-    paymentMethod: 'Card',
-  },
+  { id: '123123', customerName: 'Boss Oleg', deliveryAddress: '322 kanto nila fitz', deliveryNotes: '(if any)', items: '1x Barako, 1x 3-in-1', paymentMethod: 'Cash on Delivery', customerPhone: '09XX XXX XXXX' },
+  { id: '696969', customerName: 'Pedro Reyes', deliveryAddress: 'Block 12 Lot 3, Rizal Province', deliveryNotes: '', items: '1x Americano, 1x Cappuccino', paymentMethod: 'Card', customerPhone: '09ZZ ZZZ ZZZZ' },
 ];
 
 const initialAssignedOrders = [
-  {
-    id: '007',
-    customerName: 'Juan Dela Cruz',
-    deliveryAddress: '015 enta',
-    customerPhone: '366650',
-    status: 'In transit',
-    paymentMethod: 'Cash on Delivery',
-    items: '1x Espresso',
-    deliveryNotes: 'Leave at guard house.',
-  },
+  { id: '007', customerName: 'Juan Dela Cruz', deliveryAddress: '015 enta', customerPhone: '366650', status: 'In transit', paymentMethod: 'Cash on Delivery', items: '1x Espresso', deliveryNotes: 'Leave at guard house.' },
 ];
 
 const riderInfo = {
@@ -97,8 +144,7 @@ function Rider() {
   const [queuedOrders, setQueuedOrders] = useState(initialQueuedOrders);
   const [assignedOrders, setAssignedOrders] = useState(initialAssignedOrders);
   const [selectedQueuedOrder, setSelectedQueuedOrder] = useState(null);
-  const [selectedAssignedOrder, setSelectedAssignedOrder] = useState(initialAssignedOrders[0] || null);
-  const [showStatusOptions, setShowStatusOptions] = useState(false);
+  const [selectedAssignedOrder, setSelectedAssignedOrder] = useState(null);
 
   const handleSelectQueuedOrder = (order) => {
     setSelectedQueuedOrder(order);
@@ -112,74 +158,43 @@ function Rider() {
 
   const handleAcceptOrder = (orderToAccept) => {
     setQueuedOrders(queuedOrders.filter(order => order.id !== orderToAccept.id));
-    setAssignedOrders([...assignedOrders, { ...orderToAccept, status: 'Picked Up', customerPhone: '09XX XXX XXXX' }]);
-    setSelectedQueuedOrder(null);
-    setSelectedAssignedOrder({ ...orderToAccept, status: 'Picked Up', customerPhone: '09XX XXX XXXX' });
+    setAssignedOrders([...assignedOrders, { ...orderToAccept, status: 'Picked Up' }]);
   };
 
   const handleDeclineOrder = (orderToDecline) => {
     setQueuedOrders(queuedOrders.filter(order => order.id !== orderToDecline.id));
-    setSelectedQueuedOrder(null);
   };
 
   const handleOrderDelivered = (orderId) => {
-    if (!window.confirm(`Confirm Order #${orderId} Delivered?`)) {
-      return;
-    }
     setAssignedOrders(assignedOrders.filter(order => order.id !== orderId));
     setSelectedAssignedOrder(null);
   };
 
-  const handleStatusChange = (newStatus) => {
-    const orderId = selectedAssignedOrder.id;
+  const handleStatusChange = (orderId, newStatus) => {
     setAssignedOrders(assignedOrders.map(order =>
       order.id === orderId ? { ...order, status: newStatus } : order
     ));
-    if (selectedAssignedOrder) {
+    if (selectedAssignedOrder && selectedAssignedOrder.id === orderId) {
         setSelectedAssignedOrder(prev => ({...prev, status: newStatus}));
     }
-    setShowStatusOptions(false);
   };
-
-  const StatusDropdown = () => (
-      <div className="status-dropdown-group">
-        <button className="status-trigger-button" onClick={() => setShowStatusOptions(!showStatusOptions)}>
-            Update Status
-        </button>
-        {showStatusOptions && (
-            <div className="status-options-list">
-                <button onClick={() => handleStatusChange('Picked Up')}>Picked Up</button>
-                <button onClick={() => handleStatusChange('In transit')}>In transit</button>
-                <button onClick={() => handleStatusChange('Delivered')}>Delivered</button>
-                <button onClick={() => handleStatusChange('Failed')}>Failed</button>
-            </div>
-        )}
-      </div>
-  );
 
 
   return (
-    <div className="rider-container">
+    <div className="rider-container app"> 
       
-      {/* 1. SIDEBAR */}
-      <div className="sidebar-placeholder">
-        <h3 className="sidebar-title">DEBAR TO!!!</h3>
+      <div className="sidebar-card card">
+        <h3 className="sidebar-title">SIDEBAR TO!!!</h3>
         
-        {/* Rider Info Card */}
-        <div className="sidebar-card card">
-          <div className="modal-body">
-            <div className="d-flex align-items-center mb-3">
-              <div className="driver-icon me-2"></div>
-              <div>
+        <div className="rider-info-display">
+            <div className="driver-icon"></div>
+            <div>
                 <div className="driver-name-plate">NAME: {riderInfo.name}</div>
                 <div className="driver-info">VEHICLE TYPE: {riderInfo.vehicleType}</div>
                 <div className="driver-info">PLATE NUMBER: {riderInfo.plateNumber}</div>
-              </div>
             </div>
-          </div>
         </div>
 
-        {/* Delivery History Table */}
         <div className="delivery-history-label">DELIVERY HISTORY</div>
         <div className="delivery-history-table">
           <div className="table-row table-header"><div>DATE</div><div>ORDER ID</div><div>STATUS</div></div>
@@ -188,111 +203,57 @@ function Rider() {
         </div>
       </div>
 
-      {/* 2. MAIN CONTENT AREA */}
-      <div className="main-content-area p-4">
-        <div className="row mb-4">
-          
-          {/* Order Queue */}
-          <div className="col-md-6">
-            <div className="queue-card card">
-              <div className="queue-header card-header">Order Queue</div>
-              <div className="list-group list-group-flush">
-                {queuedOrders.length > 0 ? (
-                  queuedOrders.map((order) => (
+      <div className="main-content-area list-card">
+        
+        <div className="queue-card card">
+            <div className="queue-header card-header">Order Queue</div>
+            <div className="list-group list-group-flush">
+                {queuedOrders.map((order) => (
                     <div
-                      key={order.id}
-                      onClick={() => handleSelectQueuedOrder(order)}
-                      className={`list-group-item order-item ${selectedQueuedOrder && selectedQueuedOrder.id === order.id ? 'active' : ''}`}
+                        key={order.id}
+                        onClick={() => handleSelectQueuedOrder(order)}
+                        className={`list-group-item order-item ${selectedQueuedOrder && selectedQueuedOrder.id === order.id ? 'active' : ''}`}
                     >
-                      Order #{order.id}
-                      <button className="view-button">View</button>
+                        Order #{order.id}
+                        <button className="view-button">View</button>
                     </div>
-                  ))
-                ) : (
-                  <div className="list-group-item text-center text-muted">No new orders in queue.</div>
-                )}
-              </div>
+                ))}
             </div>
-          </div>
+        </div>
 
-          {/* Assigned Orders */}
-          <div className="col-md-6">
-            <div className="assigned-card card">
-              <div className="assigned-header card-header">Assigned Orders</div>
-              <div className="list-group list-group-flush">
-                {assignedOrders.length > 0 ? (
-                  assignedOrders.map((order) => (
+        <div className="assigned-card card">
+            <div className="assigned-header card-header">Assigned Orders</div>
+            <div className="list-group list-group-flush">
+                {assignedOrders.map((order) => (
                     <div
-                      key={order.id}
-                      onClick={() => handleSelectAssignedOrder(order)}
-                      className={`list-group-item order-item ${selectedAssignedOrder && selectedAssignedOrder.id === order.id ? 'active' : ''}`}
+                        key={order.id}
+                        onClick={() => handleSelectAssignedOrder(order)}
+                        className={`list-group-item order-item ${selectedAssignedOrder && selectedAssignedOrder.id === order.id ? 'active' : ''}`}
                     >
-                      Order #{order.id}
-                      <button className="view-button">View</button>
+                        Order #{order.id}
+                        <button className="view-button">View</button>
                     </div>
-                  ))
-                ) : (
-                  <div className="list-group-item text-center text-muted">No assigned orders.</div>
-                )}
-              </div>
+                ))}
             </div>
-          </div>
         </div>
       </div>
 
-      {/* 3. ORDER DETAILS PANEL */}
-      <div className="order-details-panel">
-        <h5 className="details-header">Order Details</h5>
-        {selectedAssignedOrder ? (
-          <>
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <span className="order-number-text">Order #{selectedAssignedOrder.id}</span>
-              
-              <div className="update-status-group">
-                <StatusDropdown />
-              </div>
-            </div>
-
-            <div className="status-text mb-3">
-              Status: <span className={`status-badge ${getStatusClass(selectedAssignedOrder.status)}`}>
-                  {selectedAssignedOrder.status}
-              </span>
-            </div>
-
-            <div className="customer-info-box info-section">
-              <h3>Customer Info:</h3>
-              <p>Name: {selectedAssignedOrder.customerName}</p>
-              <p>Address: {selectedAssignedOrder.deliveryAddress}</p>
-              <p>Contact #: {selectedAssignedOrder.customerPhone}</p>
-            </div>
-
-            <p className="payment-method-text mb-4">Payment Method: {selectedAssignedOrder.paymentMethod}</p>
-
-            <div className="mock-map-right-details">
-                {/* Placeholder for Map */}
-            </div>
-
-            <button
-              className="order-delivered-button action-btn delivered-btn"
-              onClick={() => handleOrderDelivered(selectedAssignedOrder.id)}
-            >
-              Order Delivered
-            </button>
-          </>
-        ) : (
-          <p className="text-center text-muted mt-5">Select an assigned order to view details.</p>
-        )}
-      </div>
-
-      {/* 4. The Order Details "Pop-up" at the bottom center */}
       {selectedQueuedOrder && (
-        <div className="modal-overlay bottom-center-details-container">
-            <OrderDetailsPopup
+        <QueuedOrderPopup
              order={selectedQueuedOrder}
              onAccept={handleAcceptOrder}
              onDecline={handleDeclineOrder}
+             onClose={() => setSelectedQueuedOrder(null)}
            />
-        </div>
+      )}
+
+      {selectedAssignedOrder && (
+        <AssignedOrderPopup
+             order={selectedAssignedOrder}
+             onDelivered={handleOrderDelivered}
+             onStatusChange={handleStatusChange}
+             onClose={() => setSelectedAssignedOrder(null)}
+           />
       )}
     </div>
   );
