@@ -4,13 +4,13 @@ import './Rider.css';
 const getStatusClass = (status) => {
     switch (status) {
         case "Picked Up":
-            return "status-preparing";
+            return "status-picked-up";
         case "In transit":
             return "status-transit";
         case "Delivered":
             return "status-delivered";
         case "Failed":
-            return "status-pending";
+            return "status-failed";
         default:
             return "status-default";
     }
@@ -22,11 +22,11 @@ const QueuedOrderPopup = ({ order, onAccept, onDecline, onClose }) => {
   const formattedItems = order.items; 
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay bottom-center-modal">
         <div className="modal-content order-details-popup-card">
             <div className="modal-header">
                 <h3 className="popup-order-number">Order #{order.id}</h3>
-                <span className="view-order-link">View Map</span>
+                <span className="view-map-button">View Map</span>
                 <button className="close-btn" onClick={onClose}>✖</button>
             </div>
 
@@ -56,7 +56,6 @@ const QueuedOrderPopup = ({ order, onAccept, onDecline, onClose }) => {
   );
 };
 
-
 const AssignedOrderPopup = ({ order, onDelivered, onStatusChange, onClose }) => {
     if (!order) return null;
 
@@ -77,19 +76,17 @@ const AssignedOrderPopup = ({ order, onDelivered, onStatusChange, onClose }) => 
     );
 
     return (
-        <div className="modal-overlay">
+        <div className="modal-overlay right-side-modal">
             <div className="modal-content right-details-modal">
                 <button className="close-btn" onClick={onClose}>✖</button>
 
                 <div className="modal-header">
                     <h2 className="details-header">Order Details</h2>
-                    <div className="order-status-line">
-                        <span className="order-id-display">Order #{order.id}</span>
-                    </div>
                 </div>
 
                 <div className="modal-body">
-                    <div className="d-flex justify-content-between align-items-center mb-3">
+                    <div className="d-flex justify-content-between align-items-center status-line">
+                        <span className="order-id-display">Order #{order.id}</span>
                         <StatusDropdown currentStatus={order.status} />
                     </div>
 
@@ -108,8 +105,7 @@ const AssignedOrderPopup = ({ order, onDelivered, onStatusChange, onClose }) => 
 
                     <p className="payment-method-text mb-4">Payment Method: {order.paymentMethod}</p>
 
-                    <div className="mock-map-right-details">
-                    </div>
+                    <div className="mock-map-right-details"></div>
 
                     <button
                         className="order-delivered-button action-btn delivered-btn"
@@ -126,6 +122,7 @@ const AssignedOrderPopup = ({ order, onDelivered, onStatusChange, onClose }) => 
 
 const initialQueuedOrders = [
   { id: '123123', customerName: 'Boss Oleg', deliveryAddress: '322 kanto nila fitz', deliveryNotes: '(if any)', items: '1x Barako, 1x 3-in-1', paymentMethod: 'Cash on Delivery', customerPhone: '09XX XXX XXXX' },
+  { id: '321321', customerName: 'Rosalin Santos', deliveryAddress: '101 Rose St, QC', deliveryNotes: 'Call first', items: '1x Iced Tea', paymentMethod: 'Card', customerPhone: '09AA AAA AAA' },
   { id: '696969', customerName: 'Pedro Reyes', deliveryAddress: 'Block 12 Lot 3, Rizal Province', deliveryNotes: '', items: '1x Americano, 1x Cappuccino', paymentMethod: 'Card', customerPhone: '09ZZ ZZZ ZZZZ' },
 ];
 
@@ -145,6 +142,7 @@ function Rider() {
   const [assignedOrders, setAssignedOrders] = useState(initialAssignedOrders);
   const [selectedQueuedOrder, setSelectedQueuedOrder] = useState(null);
   const [selectedAssignedOrder, setSelectedAssignedOrder] = useState(null);
+  const [isOnline, setIsOnline] = useState(true);
 
   const handleSelectQueuedOrder = (order) => {
     setSelectedQueuedOrder(order);
@@ -181,29 +179,38 @@ function Rider() {
 
 
   return (
-    <div className="rider-container app"> 
+    <div className="rider-container"> 
       
-      <div className="sidebar-card card">
-        <h3 className="sidebar-title">SIDEBAR TO!!!</h3>
+      <div className="sidebar-placeholder">
         
-        <div className="rider-info-display">
-            <div className="driver-icon"></div>
-            <div>
-                <div className="driver-name-plate">NAME: {riderInfo.name}</div>
-                <div className="driver-info">VEHICLE TYPE: {riderInfo.vehicleType}</div>
-                <div className="driver-info">PLATE NUMBER: {riderInfo.plateNumber}</div>
+        <div className="top-profile-bar">
+            <div className="profile-icon"></div>
+            <label className="toggle-switch">
+                <input type="checkbox" checked={isOnline} onChange={() => setIsOnline(!isOnline)} />
+                <span className="slider"></span>
+            </label>
+        </div>
+
+        <div className="sidebar-card card">
+            <div className="rider-info-display">
+                <div className="driver-icon"></div>
+                <div>
+                    <div className="driver-name-plate">NAME: {riderInfo.name}</div>
+                    <div className="driver-info">VEHICLE TYPE: {riderInfo.vehicleType}</div>
+                    <div className="driver-info">PLATE NUMBER: {riderInfo.plateNumber}</div>
+                </div>
             </div>
         </div>
 
         <div className="delivery-history-label">DELIVERY HISTORY</div>
         <div className="delivery-history-table">
-          <div className="table-row table-header"><div>DATE</div><div>ORDER ID</div><div>STATUS</div></div>
-          <div className="table-row"><div>11/20</div><div>#101</div><div>Done</div></div>
-          <div className="table-row"><div>11/19</div><div>#098</div><div>Done</div></div>
+            <div className="table-row table-header"><div>DATE</div><div>ORDER ID</div><div>STATUS</div></div>
+            <div className="table-row"><div>11/20</div><div>#101</div><div>Done</div></div>
+            <div className="table-row"><div>11/19</div><div>#098</div><div>Done</div></div>
         </div>
       </div>
 
-      <div className="main-content-area list-card">
+      <div className="main-content-area">
         
         <div className="queue-card card">
             <div className="queue-header card-header">Order Queue</div>
@@ -212,7 +219,7 @@ function Rider() {
                     <div
                         key={order.id}
                         onClick={() => handleSelectQueuedOrder(order)}
-                        className={`list-group-item order-item ${selectedQueuedOrder && selectedQueuedOrder.id === order.id ? 'active' : ''}`}
+                        className={`list-group-item order-item`}
                     >
                         Order #{order.id}
                         <button className="view-button">View</button>
@@ -228,7 +235,7 @@ function Rider() {
                     <div
                         key={order.id}
                         onClick={() => handleSelectAssignedOrder(order)}
-                        className={`list-group-item order-item ${selectedAssignedOrder && selectedAssignedOrder.id === order.id ? 'active' : ''}`}
+                        className={`list-group-item order-item`}
                     >
                         Order #{order.id}
                         <button className="view-button">View</button>
