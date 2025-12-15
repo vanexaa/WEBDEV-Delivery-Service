@@ -1,20 +1,23 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap');
 
 :root {
-  --dark-gray: #1a1a1a;
-  --light-gray: #f5f5f5;
-  --accept-color: #aa6e39;
-  --decline-color: #642f19;
-  --main-bg-color: #fcfdfb;
+  --main-bg-color: #f5f5f5; 
+  --dark-text: #333;
+  --primary-accent: #4a3b2a; 
+  --card-bg-color: #fffdf8; 
+  
+  --accept-color: #AA6E39;
+  --decline-color: #642F19;
+  --light-text: #F4F4F4; 
+  
   --heading-font: 'DM Sans', sans-serif;
   --subheading-font: 'DM Sans', sans-serif;
-  --sidebar-color: #343a40;
 }
 
 body {
   background-color: var(--main-bg-color);
   font-family: var(--subheading-font);
-  color: var(--dark-gray);
+  color: var(--dark-text);
   margin: 0;
   padding: 0;
 }
@@ -27,9 +30,9 @@ body {
 
 .sidebar-placeholder {
   width: 250px;
-  background-color: var(--sidebar-color);
+  background-color: var(--primary-accent); 
   padding: 20px;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   position: fixed;
   height: 100%;
 }
@@ -37,13 +40,15 @@ body {
 .sidebar-title {
   font-family: var(--heading-font);
   font-size: 1.5rem;
+  color: var(--light-text);
   margin-bottom: 20px;
 }
 
 .sidebar-card {
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background-color: var(--card-bg-color);
+  border-radius: 24px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  padding: 10px;
 }
 
 .driver-icon {
@@ -51,6 +56,7 @@ body {
   height: 30px;
   border-radius: 50%;
   background-color: #ccc;
+  border: 1px solid var(--primary-accent);
 }
 
 .driver-name-plate, .driver-info {
@@ -59,30 +65,34 @@ body {
 
 .delivery-history-label {
   font-weight: bold;
+  color: var(--light-text);
   margin-top: 15px;
   margin-bottom: 5px;
 }
 
 .delivery-history-table {
-  border: 1px solid #eee;
+  border: 1px solid #555;
   border-radius: 4px;
   overflow: hidden;
+  margin-top: 10px;
 }
 
 .table-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #555;
   font-size: 0.8rem;
 }
 .table-row > div {
   padding: 5px;
-  border-right: 1px solid #eee;
-  background-color: var(--light-gray);
+  border-right: 1px solid #555;
+  background-color: #555; 
+  color: #ddd;
 }
 .table-header > div {
-    background-color: #ddd;
+    background-color: #444;
     font-weight: bold;
+    color: white;
 }
 .table-row > div:last-child {
   border-right: none;
@@ -97,16 +107,20 @@ body {
 
 .queue-card, .assigned-card {
   border: none;
-  border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 24px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  background-color: white; 
+  height: 200px;
 }
 
 .queue-header, .assigned-header {
   background-color: white;
   border-bottom: 1px solid #eee;
-  padding: 1rem;
+  padding: 0.75rem;
   font-family: var(--subheading-font);
   font-weight: bold;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
 }
 
 .order-item {
@@ -119,19 +133,19 @@ body {
 }
 
 .order-item.active {
-  background-color: var(--light-gray) !important;
-  color: var(--dark-gray);
-  border-left-color: var(--accept-color);
+  background-color: #f0f0f0 !important;
+  color: var(--dark-text);
+  border-left-color: var(--accept-color); 
   font-weight: bold;
 }
 
 .view-button {
+  background-color: white;
   border-color: #ccc;
   color: #333;
   font-size: 0.75rem;
   padding: 0.2rem 0.5rem;
 }
-
 
 .order-details-panel {
   width: 350px;
@@ -140,7 +154,7 @@ body {
   right: 0;
   top: 0;
   height: 100%;
-  background-color: white;
+  background-color: var(--main-bg-color); 
   box-shadow: -2px 0 5px rgba(0, 0, 0, 0.05);
   font-size: 0.9rem;
 }
@@ -151,32 +165,21 @@ body {
   margin-bottom: 20px;
 }
 
-.order-number-text {
-  font-weight: bold;
-}
-
 .status-label {
   color: #666;
-}
-
-.status-dropdown {
-  width: auto;
-  display: inline-block;
   font-size: 0.85rem;
 }
 
-.status-text {
-  font-weight: 500;
-}
-
-.customer-info-box p, .payment-method-text {
-  margin-bottom: 0.25rem;
+.status-dropdown {
+  background-color: var(--card-bg-color); 
+  border: 1px solid #ccc;
 }
 
 .mock-map-right-details {
   height: 200px;
-  background-color: #e0e0e0;
-  border: 1px solid #ccc;
+  background-color: white;
+  border: 1px solid #ddd;
+  margin-top: 15px;
   margin-bottom: 20px;
 }
 
@@ -186,10 +189,8 @@ body {
   border-color: var(--accept-color);
   font-family: var(--heading-font);
   font-weight: bold;
-}
-.order-delivered-button:hover {
-  background-color: #885522;
-  border-color: #885522;
+  padding: 10px 0;
+  border-radius: 5px;
 }
 
 .bottom-center-details-container {
@@ -202,26 +203,10 @@ body {
 
 .order-details-popup-card {
   width: 450px;
-  border-radius: 20px;
+  border-radius: 24px;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
   border: none;
-  background-color: white;
-}
-
-.popup-order-number {
-  font-family: var(--heading-font);
-  font-weight: bold;
-  font-size: 1.1rem;
-}
-
-.view-map-button {
-  color: var(--accept-color);
-  font-size: 0.8rem;
-}
-
-.popup-details-text p {
-  margin-bottom: 0.25rem;
-  font-size: 0.9rem;
+  background-color: var(--card-bg-color);
 }
 
 .accept-button {
@@ -229,10 +214,7 @@ body {
   border-color: var(--accept-color);
   font-family: var(--subheading-font);
   font-weight: bold;
-}
-.accept-button:hover {
-    background-color: #885522;
-    border-color: #885522;
+  border-radius: 5px;
 }
 
 .decline-button {
@@ -240,8 +222,5 @@ body {
   border-color: var(--decline-color);
   font-family: var(--subheading-font);
   font-weight: bold;
-}
-.decline-button:hover {
-    background-color: #441100;
-    border-color: #441100;
+  border-radius: 5px;
 }
