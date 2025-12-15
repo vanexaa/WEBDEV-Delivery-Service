@@ -24,7 +24,7 @@ const QueuedOrderPopup = ({ order, onAccept, onDecline, onClose }) => {
   return (
     <div className="modal-overlay bottom-center-modal">
         <div className="modal-content order-details-popup-card">
-            <div className="modal-header">
+            <div className="modal-header d-flex justify-content-between align-items-center">
                 <h3 className="popup-order-number">Order #{order.id}</h3>
                 <span className="view-map-button">View Map</span>
                 <button className="close-btn" onClick={onClose}>✖</button>
@@ -37,7 +37,7 @@ const QueuedOrderPopup = ({ order, onAccept, onDecline, onClose }) => {
                 <p>Items: {formattedItems}</p>
             </div>
 
-            <div className="modal-footer action-buttons justify-content-center">
+            <div className="modal-footer d-flex justify-content-center action-buttons mt-4">
                 <button
                     className="action-btn failed-btn"
                     onClick={() => { onDecline(order); onClose(); }}
@@ -60,8 +60,8 @@ const AssignedOrderPopup = ({ order, onDelivered, onStatusChange, onClose }) => 
     if (!order) return null;
 
     const StatusDropdown = ({ currentStatus }) => (
-        <div className="status-dropdown-group">
-            <label className="status-label">Update Status:</label>
+        <div className="status-dropdown-group d-flex align-items-center">
+            <label className="status-label me-2">Update Status:</label>
             <select
                 className="status-select"
                 value={currentStatus}
@@ -85,7 +85,7 @@ const AssignedOrderPopup = ({ order, onDelivered, onStatusChange, onClose }) => 
                 </div>
 
                 <div className="modal-body">
-                    <div className="d-flex justify-content-between align-items-center status-line">
+                    <div className="d-flex justify-content-between align-items-center status-line mb-3">
                         <span className="order-id-display">Order #{order.id}</span>
                         <StatusDropdown currentStatus={order.status} />
                     </div>
@@ -181,6 +181,7 @@ function Rider() {
   return (
     <div className="rider-container"> 
       
+      {/* 1. LEFT SIDEBAR (Fixed) */}
       <div className="sidebar-placeholder">
         
         <div className="top-profile-bar">
@@ -192,8 +193,8 @@ function Rider() {
         </div>
 
         <div className="sidebar-card card">
-            <div className="rider-info-display">
-                <div className="driver-icon"></div>
+            <div className="rider-info-display d-flex align-items-center mb-3">
+                <div className="driver-icon me-3"></div>
                 <div>
                     <div className="driver-name-plate">NAME: {riderInfo.name}</div>
                     <div className="driver-info">VEHICLE TYPE: {riderInfo.vehicleType}</div>
@@ -210,16 +211,17 @@ function Rider() {
         </div>
       </div>
 
-      <div className="main-content-area">
+      {/* 2. RIGHT MAIN CONTENT AREA (Scrollable, Side-by-Side Cards) */}
+      <div className="main-content-area d-flex">
         
-        <div className="queue-card card">
+        <div className="queue-card card flex-fill">
             <div className="queue-header card-header">Order Queue</div>
             <div className="list-group list-group-flush">
                 {queuedOrders.map((order) => (
                     <div
                         key={order.id}
                         onClick={() => handleSelectQueuedOrder(order)}
-                        className={`list-group-item order-item`}
+                        className={`list-group-item order-item d-flex justify-content-between align-items-center`}
                     >
                         Order #{order.id}
                         <button className="view-button">View</button>
@@ -228,14 +230,14 @@ function Rider() {
             </div>
         </div>
 
-        <div className="assigned-card card">
+        <div className="assigned-card card flex-fill">
             <div className="assigned-header card-header">Assigned Orders</div>
             <div className="list-group list-group-flush">
                 {assignedOrders.map((order) => (
                     <div
                         key={order.id}
                         onClick={() => handleSelectAssignedOrder(order)}
-                        className={`list-group-item order-item`}
+                        className={`list-group-item order-item d-flex justify-content-between align-items-center`}
                     >
                         Order #{order.id}
                         <button className="view-button">View</button>
@@ -245,6 +247,7 @@ function Rider() {
         </div>
       </div>
 
+      {/* 3. POPUPS */}
       {selectedQueuedOrder && (
         <QueuedOrderPopup
              order={selectedQueuedOrder}
