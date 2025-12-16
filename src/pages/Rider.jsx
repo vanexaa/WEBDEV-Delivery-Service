@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useState } from 'react';
 import { BsPerson } from 'react-icons/bs'; 
-import './AdminRider.css'; 
+import '../css/Rider.css'; 
 
 const ordersData = [
     { id: '123123', type: 'queue', customerName: 'Juan Dela Cruz', address: '101 Main St.', notes: 'Call upon arrival', items: '1x Espresso, 1x Pastel De Nata' },
@@ -85,7 +85,7 @@ const AssignedOrderModal = ({ order, onClose, onDelivered }) => (
     </div>
 );
 
-function App() {
+function Rider() {
   const [isOnline, setIsOnline] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -184,4 +184,4 @@ function App() {
   );
 }
 
-export default App;
+export default Rider;

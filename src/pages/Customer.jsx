@@ -1,6 +1,6 @@
 import React from "react";
-import "./Customer.css";
-import etaImage from "../../assets/capy.png";
+import "../css/Customer.css";
+import etaImage from "../assets/capy.png";
 
 export default function Customer({ rider, eta, orders }) {
   const defaultRider = {
