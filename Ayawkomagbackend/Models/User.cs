@@ -1,23 +1,23 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Ayawkomagbackend.Models 
 {
     public class User
     {
         [Key]
-        public int UserId { get; set; }  // Primary key
+        public int UserId { get; set; }
+
+        [Required]
+        [EmailAddress]
+        [MaxLength(255)]
+        public string Email { get; set; } = string.Empty;
 
         [Required]
         [MaxLength(255)]
-        public string Email { get; set; } = null!;  // User email
-
-        [Required]
-        [MaxLength(255)]
-        public string PasswordHash { get; set; } = null!;  // Hashed password
+        public string PasswordHash { get; set; } = string.Empty;
 
         [Required]
         [MaxLength(50)]
-        public string Role { get; set; } = "User";  // Role (e.g., Admin, User)
+        public string Role { get; set; } = "User"; // e.g., Admin, User, Rider_User
     }
 }
