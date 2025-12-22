@@ -19,5 +19,9 @@ namespace Ayawkomagbackend.Models
         [Required]
         [MaxLength(50)]
         public string Role { get; set; } = "User"; // e.g., Admin, User, Rider_User
+        
+
+        public ICollection<Delivery> Deliveries { get; set; } = new List<Delivery>();
+
     }
 }

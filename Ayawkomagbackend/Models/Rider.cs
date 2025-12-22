@@ -17,5 +17,9 @@ namespace Ayawkomagbackend.Models
 
         public bool IsAvailable { get; set; } = true;
 
+        // Navigation property
+        public ICollection<Delivery> Deliveries { get; set; } = new List<Delivery>();
+
+
     }
 }

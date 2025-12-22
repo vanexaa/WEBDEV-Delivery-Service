@@ -12,6 +12,7 @@ namespace Ayawkomagbackend.Data
 
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<Rider> Riders { get; set; } = null!; 
+        public DbSet<Delivery> Deliveries { get; set; } = null!; 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -24,6 +25,18 @@ namespace Ayawkomagbackend.Data
                 .IsUnique();
 
             modelBuilder.Entity<Rider>().ToTable("Riders");
+
+            modelBuilder.Entity<Delivery>()
+                .HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            modelBuilder.Entity<Delivery>()
+                .HasOne(d => d.Rider)
+                .WithMany()
+                .HasForeignKey(d => d.RiderId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }
