@@ -10,19 +10,13 @@ namespace Ayawkomagbackend.Models
         public int FailureId { get; set; }
 
         public int DeliveryId { get; set; }
-
-        // Optional navigation
         [ForeignKey(nameof(DeliveryId))]
-        public Delivery? Delivery { get; set; }
+        public Delivery Delivery { get; set; } = null!;
 
         [Required]
         [MaxLength(500)]
         public string Reason { get; set; } = string.Empty;
 
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-
-        //Navigation
-        public ICollection<Feedback> Feedbacks { get; set; } = new List<Feedback>();
-
     }
 }

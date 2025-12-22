@@ -37,12 +37,15 @@ namespace Ayawkomagbackend.Data
             // ---------------------------
             // Indexes
             // ---------------------------
-            modelBuilder.Entity<User>()
-                .HasIndex(u => u.Email)
-                .IsUnique();
+            modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
+
+            modelBuilder.Entity<Delivery>().HasIndex(d => d.OrderId);
+            modelBuilder.Entity<Delivery>().HasIndex(d => d.RiderId);
+            modelBuilder.Entity<Delivery>().HasIndex(d => d.Status);
+            modelBuilder.Entity<Delivery>().HasIndex(d => d.UpdatedAt);
 
             // ---------------------------
-            // Delivery relationships
+            // Relationships
             // ---------------------------
             modelBuilder.Entity<Delivery>()
                 .HasOne(d => d.User)
@@ -56,27 +59,18 @@ namespace Ayawkomagbackend.Data
                 .HasForeignKey(d => d.RiderId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            // ---------------------------
-            // StatusHistory -> Delivery
-            // ---------------------------
             modelBuilder.Entity<StatusHistory>()
                 .HasOne(sh => sh.Delivery)
                 .WithMany(d => d.StatusHistories)
                 .HasForeignKey(sh => sh.DeliveryId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // ---------------------------
-            // DeliveryFailure -> Delivery
-            // ---------------------------
             modelBuilder.Entity<DeliveryFailure>()
                 .HasOne(df => df.Delivery)
                 .WithMany(d => d.DeliveryFailures)
                 .HasForeignKey(df => df.DeliveryId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // ---------------------------
-            // Feedback relationships
-            // ---------------------------
             modelBuilder.Entity<Feedback>()
                 .HasOne(f => f.Delivery)
                 .WithMany(d => d.Feedbacks)
@@ -89,9 +83,6 @@ namespace Ayawkomagbackend.Data
                 .HasForeignKey(f => f.RiderId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // ---------------------------
-            // DeliveryAssignment relationships
-            // ---------------------------
             modelBuilder.Entity<DeliveryAssignment>()
                 .HasOne(da => da.Delivery)
                 .WithMany(d => d.Assignments)

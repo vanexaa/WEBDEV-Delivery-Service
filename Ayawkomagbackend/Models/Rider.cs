@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace Ayawkomagbackend.Models
@@ -15,17 +17,13 @@ namespace Ayawkomagbackend.Models
 
         public string PhoneNumber { get; set; } = string.Empty;
 
+        // Availability flag
         public bool IsAvailable { get; set; } = true;
 
-        // Navigation property
+       
+        // Navigation collections
         public ICollection<Delivery> Deliveries { get; set; } = new List<Delivery>();
-
         public ICollection<Feedback> Feedbacks { get; set; } = new List<Feedback>();
-
         public ICollection<DeliveryAssignment> Assignments { get; set; } = new List<DeliveryAssignment>();
-
-
-
-
     }
 }

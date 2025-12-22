@@ -1,6 +1,7 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace Ayawkomagbackend.Models 
+namespace Ayawkomagbackend.Models
 {
     public class User
     {
@@ -8,20 +9,14 @@ namespace Ayawkomagbackend.Models
         public int UserId { get; set; }
 
         [Required]
-        [EmailAddress]
-        [MaxLength(255)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
         public string Email { get; set; } = string.Empty;
 
-        [Required]
-        [MaxLength(255)]
-        public string PasswordHash { get; set; } = string.Empty;
+        public string PhoneNumber { get; set; } = string.Empty;
 
-        [Required]
-        [MaxLength(50)]
-        public string Role { get; set; } = "User"; // e.g., Admin, User, Rider_User
-        
-
+        // Navigation collection
         public ICollection<Delivery> Deliveries { get; set; } = new List<Delivery>();
-
     }
 }

@@ -10,10 +10,8 @@ namespace Ayawkomagbackend.Models
         public int HistoryId { get; set; }
 
         public int DeliveryId { get; set; }
-
-        // Optional navigation
         [ForeignKey(nameof(DeliveryId))]
-        public Delivery? Delivery { get; set; }
+        public Delivery Delivery { get; set; } = null!;
 
         [Required]
         [MaxLength(50)]

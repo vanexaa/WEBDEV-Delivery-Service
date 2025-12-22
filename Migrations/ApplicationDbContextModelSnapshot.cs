@@ -33,9 +33,6 @@ namespace Ayawkomagbackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime?>("EstimatedArrivalTime")
-                        .HasColumnType("datetime2");
-
                     b.Property<int>("OrderId")
                         .HasColumnType("int");
 
@@ -47,12 +44,21 @@ namespace Ayawkomagbackend.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
                     b.HasKey("DeliveryId");
 
+                    b.HasIndex("OrderId");
+
                     b.HasIndex("RiderId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("UpdatedAt");
 
                     b.HasIndex("UserId");
 
@@ -129,9 +135,6 @@ namespace Ayawkomagbackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("DeliveryFailureFailureId")
-                        .HasColumnType("int");
-
                     b.Property<int>("DeliveryId")
                         .HasColumnType("int");
 
@@ -142,8 +145,6 @@ namespace Ayawkomagbackend.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("FeedbackId");
-
-                    b.HasIndex("DeliveryFailureFailureId");
 
                     b.HasIndex("DeliveryId");
 
@@ -220,18 +221,15 @@ namespace Ayawkomagbackend.Migrations
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("PasswordHash")
+                    b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Role")
+                    b.Property<string>("PhoneNumber")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("UserId");
 
@@ -291,10 +289,6 @@ namespace Ayawkomagbackend.Migrations
 
             modelBuilder.Entity("Ayawkomagbackend.Models.Feedback", b =>
                 {
-                    b.HasOne("Ayawkomagbackend.Models.DeliveryFailure", null)
-                        .WithMany("Feedbacks")
-                        .HasForeignKey("DeliveryFailureFailureId");
-
                     b.HasOne("Ayawkomagbackend.Models.Delivery", "Delivery")
                         .WithMany("Feedbacks")
                         .HasForeignKey("DeliveryId")
@@ -332,11 +326,6 @@ namespace Ayawkomagbackend.Migrations
                     b.Navigation("Feedbacks");
 
                     b.Navigation("StatusHistories");
-                });
-
-            modelBuilder.Entity("Ayawkomagbackend.Models.DeliveryFailure", b =>
-                {
-                    b.Navigation("Feedbacks");
                 });
 
             modelBuilder.Entity("Ayawkomagbackend.Models.Rider", b =>
