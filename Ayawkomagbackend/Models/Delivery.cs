@@ -30,6 +30,13 @@ namespace Ayawkomagbackend.Models
         public Rider? Rider { get; set; }
 
         public ICollection<StatusHistory> StatusHistories { get; set; } = new List<StatusHistory>();
+
         public ICollection<DeliveryFailure> DeliveryFailures { get; set; } = new List<DeliveryFailure>();
+
+        public ICollection<DeliveryAssignment> Assignments { get; set; } = new List<DeliveryAssignment>();
+
+        public ICollection<Feedback> Feedbacks { get; set; } = new List<Feedback>();
+
     }
+
 }

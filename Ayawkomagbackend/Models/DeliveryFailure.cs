@@ -20,5 +20,9 @@ namespace Ayawkomagbackend.Models
         public string Reason { get; set; } = string.Empty;
 
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+        //Navigation
+        public ICollection<Feedback> Feedbacks { get; set; } = new List<Feedback>();
+
     }
 }

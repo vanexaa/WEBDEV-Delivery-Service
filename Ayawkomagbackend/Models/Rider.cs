@@ -20,6 +20,12 @@ namespace Ayawkomagbackend.Models
         // Navigation property
         public ICollection<Delivery> Deliveries { get; set; } = new List<Delivery>();
 
+        public ICollection<Feedback> Feedbacks { get; set; } = new List<Feedback>();
+
+        public ICollection<DeliveryAssignment> Assignments { get; set; } = new List<DeliveryAssignment>();
+
+
+
 
     }
 }
