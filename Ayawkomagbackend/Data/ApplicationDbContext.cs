@@ -11,6 +11,7 @@ namespace Ayawkomagbackend.Data
         }
 
         public DbSet<User> Users { get; set; } = null!;
+        public DbSet<Rider> Riders { get; set; } = null!; 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -21,6 +22,8 @@ namespace Ayawkomagbackend.Data
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
+
+            modelBuilder.Entity<Rider>().ToTable("Riders");
         }
     }
 }
