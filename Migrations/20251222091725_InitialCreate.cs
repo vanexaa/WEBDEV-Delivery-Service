@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Ayawkomagbackend.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreateClean : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -53,9 +53,7 @@ namespace Ayawkomagbackend.Migrations
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     EstimatedArrivalTime = table.Column<DateTime>(type: "datetime2", nullable: true),
                     UserId = table.Column<int>(type: "int", nullable: false),
-                    RiderId = table.Column<int>(type: "int", nullable: true),
-                    RiderId1 = table.Column<int>(type: "int", nullable: true),
-                    UserId1 = table.Column<int>(type: "int", nullable: true)
+                    RiderId = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -65,23 +63,56 @@ namespace Ayawkomagbackend.Migrations
                         column: x => x.RiderId,
                         principalTable: "Riders",
                         principalColumn: "RiderId",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_Deliveries_Riders_RiderId1",
-                        column: x => x.RiderId1,
-                        principalTable: "Riders",
-                        principalColumn: "RiderId");
+                        onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "FK_Deliveries_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "UserId",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "DeliveryFailures",
+                columns: table => new
+                {
+                    FailureId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    DeliveryId = table.Column<int>(type: "int", nullable: false),
+                    Reason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    Timestamp = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DeliveryFailures", x => x.FailureId);
                     table.ForeignKey(
-                        name: "FK_Deliveries_Users_UserId1",
-                        column: x => x.UserId1,
-                        principalTable: "Users",
-                        principalColumn: "UserId");
+                        name: "FK_DeliveryFailures_Deliveries_DeliveryId",
+                        column: x => x.DeliveryId,
+                        principalTable: "Deliveries",
+                        principalColumn: "DeliveryId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "StatusHistories",
+                columns: table => new
+                {
+                    HistoryId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    DeliveryId = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Timestamp = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ChangedBy = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StatusHistories", x => x.HistoryId);
+                    table.ForeignKey(
+                        name: "FK_StatusHistories_Deliveries_DeliveryId",
+                        column: x => x.DeliveryId,
+                        principalTable: "Deliveries",
+                        principalColumn: "DeliveryId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
@@ -90,19 +121,19 @@ namespace Ayawkomagbackend.Migrations
                 column: "RiderId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Deliveries_RiderId1",
-                table: "Deliveries",
-                column: "RiderId1");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Deliveries_UserId",
                 table: "Deliveries",
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Deliveries_UserId1",
-                table: "Deliveries",
-                column: "UserId1");
+                name: "IX_DeliveryFailures_DeliveryId",
+                table: "DeliveryFailures",
+                column: "DeliveryId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StatusHistories_DeliveryId",
+                table: "StatusHistories",
+                column: "DeliveryId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",
@@ -114,6 +145,12 @@ namespace Ayawkomagbackend.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "DeliveryFailures");
+
+            migrationBuilder.DropTable(
+                name: "StatusHistories");
+
             migrationBuilder.DropTable(
                 name: "Deliveries");
 

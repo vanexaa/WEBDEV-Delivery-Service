@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Ayawkomagbackend.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251222084755_InitialCreateClean")]
-    partial class InitialCreateClean
+    [Migration("20251222091725_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -45,9 +45,6 @@ namespace Ayawkomagbackend.Migrations
                     b.Property<int?>("RiderId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("RiderId1")
-                        .HasColumnType("int");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -56,20 +53,39 @@ namespace Ayawkomagbackend.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("UserId1")
-                        .HasColumnType("int");
-
                     b.HasKey("DeliveryId");
 
                     b.HasIndex("RiderId");
 
-                    b.HasIndex("RiderId1");
-
                     b.HasIndex("UserId");
 
-                    b.HasIndex("UserId1");
+                    b.ToTable("Deliveries", (string)null);
+                });
 
-                    b.ToTable("Deliveries");
+            modelBuilder.Entity("Ayawkomagbackend.Models.DeliveryFailure", b =>
+                {
+                    b.Property<int>("FailureId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FailureId"));
+
+                    b.Property<int>("DeliveryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("FailureId");
+
+                    b.HasIndex("DeliveryId");
+
+                    b.ToTable("DeliveryFailures", (string)null);
                 });
 
             modelBuilder.Entity("Ayawkomagbackend.Models.Rider", b =>
@@ -98,6 +114,36 @@ namespace Ayawkomagbackend.Migrations
                     b.HasKey("RiderId");
 
                     b.ToTable("Riders", (string)null);
+                });
+
+            modelBuilder.Entity("Ayawkomagbackend.Models.StatusHistory", b =>
+                {
+                    b.Property<int>("HistoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryId"));
+
+                    b.Property<string>("ChangedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("DeliveryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("HistoryId");
+
+                    b.HasIndex("DeliveryId");
+
+                    b.ToTable("StatusHistories", (string)null);
                 });
 
             modelBuilder.Entity("Ayawkomagbackend.Models.User", b =>
@@ -134,27 +180,48 @@ namespace Ayawkomagbackend.Migrations
             modelBuilder.Entity("Ayawkomagbackend.Models.Delivery", b =>
                 {
                     b.HasOne("Ayawkomagbackend.Models.Rider", "Rider")
-                        .WithMany()
-                        .HasForeignKey("RiderId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Ayawkomagbackend.Models.Rider", null)
                         .WithMany("Deliveries")
-                        .HasForeignKey("RiderId1");
+                        .HasForeignKey("RiderId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Ayawkomagbackend.Models.User", "User")
-                        .WithMany()
+                        .WithMany("Deliveries")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Ayawkomagbackend.Models.User", null)
-                        .WithMany("Deliveries")
-                        .HasForeignKey("UserId1");
-
                     b.Navigation("Rider");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Ayawkomagbackend.Models.DeliveryFailure", b =>
+                {
+                    b.HasOne("Ayawkomagbackend.Models.Delivery", "Delivery")
+                        .WithMany("DeliveryFailures")
+                        .HasForeignKey("DeliveryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Delivery");
+                });
+
+            modelBuilder.Entity("Ayawkomagbackend.Models.StatusHistory", b =>
+                {
+                    b.HasOne("Ayawkomagbackend.Models.Delivery", "Delivery")
+                        .WithMany("StatusHistories")
+                        .HasForeignKey("DeliveryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Delivery");
+                });
+
+            modelBuilder.Entity("Ayawkomagbackend.Models.Delivery", b =>
+                {
+                    b.Navigation("DeliveryFailures");
+
+                    b.Navigation("StatusHistories");
                 });
 
             modelBuilder.Entity("Ayawkomagbackend.Models.Rider", b =>

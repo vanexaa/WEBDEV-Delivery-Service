@@ -28,5 +28,8 @@ namespace Ayawkomagbackend.Models
         public int? RiderId { get; set; }
         [ForeignKey(nameof(RiderId))]
         public Rider? Rider { get; set; }
+
+        public ICollection<StatusHistory> StatusHistories { get; set; } = new List<StatusHistory>();
+        public ICollection<DeliveryFailure> DeliveryFailures { get; set; } = new List<DeliveryFailure>();
     }
 }
