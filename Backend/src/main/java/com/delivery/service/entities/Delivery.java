@@ -12,7 +12,7 @@ public class Delivery {
     private Long deliveryID; // Primary Key from ERD
 
     @Column(name = "order_id")
-    private Long order_ID; // FK: Link to the specific order
+    private Long orderId; // FK: Link to the specific order
 
     @Column(name = "customer_id")
     private Long customer_ID; // FK: Link to the customer receiving the order
@@ -49,8 +49,8 @@ public class Delivery {
     public Long getDeliveryID() { return deliveryID; }
     public void setDeliveryID(Long deliveryID) { this.deliveryID = deliveryID; }
 
-    public Long getOrder_ID() { return order_ID; }
-    public void setOrder_ID(Long order_ID) { this.order_ID = order_ID; }
+    public Long getOrderId() { return orderId; }
+    public void setOrderId(Long orderId) { this.orderId = orderId; }
 
     public Long getCustomer_ID() { return customer_ID; }
     public void setCustomer_ID(Long customer_ID) { this.customer_ID = customer_ID; }

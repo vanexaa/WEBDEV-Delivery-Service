@@ -1,0 +1,36 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Backend: spring-boot:run",
+      "type": "shell",
+      "command": "mvn -f Backend/pom.xml spring-boot:run",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: spring-boot:run (debug)",
+      "type": "shell",
+      "command": "mvn -f Backend/pom.xml -Dspring-boot.run.jvmArguments=\"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005\" spring-boot:run",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: package",
+      "type": "shell",
+      "command": "mvn -f Backend/pom.xml -DskipTests package",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

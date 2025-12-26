@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Attach to Backend (Debug)",
+      "request": "attach",
+      "hostName": "localhost",
+      "port": 5005,
+      "preLaunchTask": "Backend: spring-boot:run (debug)"
+    },
+    {
+      "type": "java",
+      "name": "Run Backend (Package and Run)",
+      "request": "launch",
+      "mainClass": "com.delivery.service.DeliveryServiceApplication",
+      "cwd": "${workspaceFolder}/Backend",
+      "preLaunchTask": "Backend: package"
+    }
+  ]
+}

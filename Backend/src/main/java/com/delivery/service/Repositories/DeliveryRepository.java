@@ -7,5 +7,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface DeliveryRepository extends JpaRepository<Delivery, Long> {
     // This allows you to find deliveries by order ID for your GET /eta endpoint
-    java.util.Optional<Delivery> findByOrder_ID(Long orderID);
+    java.util.Optional<Delivery> findByOrderId(Long orderId);
 }
