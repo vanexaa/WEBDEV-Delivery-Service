@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // --- START: Database Configuration ---
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? 
-    "Server=JUYSI\\SQLEXPRESS;Database=DeliveryServiceDB;Trusted_Connection=True;MultipleActiveResultSets=true";
+    "Server=JUYSI\\SQLEXPRESS;Database=DeliveryServiceDB;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
 
 builder.Services.AddDbContext<DeliveryContext>(options =>
     options.UseSqlServer(connectionString));
