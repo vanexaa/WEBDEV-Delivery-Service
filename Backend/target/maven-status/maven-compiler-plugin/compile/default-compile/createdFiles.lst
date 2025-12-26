@@ -3,6 +3,7 @@ com\delivery\service\entities\RiderStatusLog.class
 com\delivery\service\repositories\DeliveryRepository.class
 com\delivery\service\controllers\CustomerController.class
 com\delivery\service\services\DeliveryService.class
+com\delivery\service\config\SecurityConfig.class
 com\delivery\service\repositories\VehicleRepository.class
 com\delivery\service\repositories\DeliveryRiderRepository.class
 com\delivery\service\repositories\RiderStatusLogRepository.class
