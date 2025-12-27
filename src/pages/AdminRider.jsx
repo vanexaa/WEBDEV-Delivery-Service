@@ -1,8 +1,8 @@
 import { useState } from "react";
-import "./AdminRider.css"; // THIS LINE IS CRITICAL. DO NOT DELETE IT.
+import "../css/AdminRider.css";
 import kapebaralogo from "/src/assets/kapebara logo.png";
 
-function App() {
+function AdminRider() {
   const [currentView, setCurrentView] = useState("dashboard");
   const [selectedRider, setSelectedRider] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -621,4 +621,4 @@ const handleImageUpload = (e) => {
   );
 }
 
-export default App;
+export default AdminRider;
