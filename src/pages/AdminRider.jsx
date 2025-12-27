@@ -224,94 +224,92 @@ const handleImageUpload = (e) => {
       )}
 
       {/* === VIEW 2: RIDER LIST === */}
-      {currentView === "riders" && (
-        <div className="rider-container">
-          <div className="back-btn" onClick={() => setCurrentView("dashboard")}>
-            ←
-          </div>
-<div className="tabs">
-      {/* This is the active tab, clicking it keeps us here */}
-      <span 
-        className="tab active" 
-        onClick={() => setCurrentView("riders")}
-      >
+{currentView === "riders" && (
+  <div className="rider-container">
+    {/* Back Button */}
+    <div className="back-btn" onClick={() => setCurrentView("dashboard")}>
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+      </svg>
+    </div>
+
+    {/* Tabs */}
+    <div className="tabs">
+      <span className="tab active">
         Rider's List
       </span>
-      
-      {/* This is the INACTIVE tab. Clicking it switches to 'deliveries' */}
-      <span 
-        className="tab" 
+
+      <span
+        className="tab"
         onClick={() => setCurrentView("deliveries")}
-        style={{ cursor: "pointer" }} /* Optional: ensures hand cursor shows */
+        style={{ cursor: "pointer" }}
       >
-        On-Going deliveries
+        On-Going Deliveries
       </span>
     </div>
-          <div className="list-card">
-            <div className="list-header">
-              <span>Rider name</span>
-              <span>Availability</span>
+
+    {/* Rider List */}
+    <div className="list-card">
+      <div className="list-header">
+        <span>Rider name</span>
+        <span>Availability</span>
+      </div>
+
+      <div className="riders-list">
+        {riders.map((rider) => (
+          <div key={rider.id} className="rider-row">
+            <div className="rider-info">
+              <div className="avatar-small">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="#364152"
+                >
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+              </div>
+
+              <span
+                className="rider-name"
+                onClick={() => setSelectedRider(rider)}
+              >
+                {rider.name}
+              </span>
             </div>
 
-            <div className="riders-list">
-              {riders.map((rider) => (
-                <div key={rider.id} className="rider-row">
-                  <div className="rider-info">
-                    <div className="avatar-small">
-                      {/* Icon */}
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="#364152"
-                      >
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                      </svg>
-                    </div>
-                    {/* Click Name to Open Popup */}
-                    <span
-                      className="rider-name"
-                      onClick={() => setSelectedRider(rider)}
-                    >
-                      {rider.name}
-                    </span>
-                  </div>
-
-                  <div className="status-select">
-                    <select defaultValue={rider.status}>
-                      <option>Available</option>
-                      <option>On Delivery</option>
-                      <option>Break</option>
-                    </select>
-                  </div>
-                </div>
-              ))}
+            <div className="status-select">
+              <select defaultValue={rider.status}>
+                <option>Available</option>
+                <option>On Delivery</option>
+                <option>Break</option>
+              </select>
             </div>
           </div>
-        </div>
-      )}
-
+        ))}
+      </div>
+    </div>
+  </div>
+)}
       {/* === VIEW 3: DELIVERY LIST === */}
       {currentView === "deliveries" && (
-        <div className="rider-container">
-          <div className="back-btn" onClick={() => setCurrentView("dashboard")}>
-            ←
-          </div>
-<div className="tabs">
-      {/* This is the INACTIVE tab. Clicking it switches to 'riders' */}
-      <span 
-        className="tab" 
+  <div className="rider-container">
+    <div className="back-btn" onClick={() => setCurrentView("dashboard")}>
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+      </svg>
+    </div>
+
+    <div className="tabs">
+      <span
+        className="tab"
         onClick={() => setCurrentView("riders")}
         style={{ cursor: "pointer" }}
       >
         Rider's List
       </span>
 
-      {/* This is the active tab */}
-      <span 
-        className="tab active" 
-        onClick={() => setCurrentView("deliveries")}
-      >
+      <span className="tab active">
         On-Going Deliveries
       </span>
     </div>
@@ -369,12 +367,21 @@ const handleImageUpload = (e) => {
       {selectedRider && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <button
-              className="close-btn"
-              onClick={() => setSelectedRider(null)}
-            >
-              X
-            </button>
+            <button className="close-btn" onClick={() => setSelectedRider(null)}>
+  <svg 
+    width="24" 
+    height="24" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor"
+    strokeWidth="3" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
 
             <div className="modal-header">
               {/* === AVATAR UPLOAD SECTION === */}
@@ -442,13 +449,22 @@ const handleImageUpload = (e) => {
       {selectedOrder && !showFailedReasonModal && (
         <div className="modal-overlay">
           <div className="modal-content delivery-modal">
-            <button
-              className="close-btn"
-              onClick={() => setSelectedOrder(null)}
-            >
-              X
-            </button>
 
+            <button className="close-btn" onClick={() => setSelectedOrder(null)}>
+  <svg 
+    width="24" 
+    height="24" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor"
+    strokeWidth="3" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
             <div className="modal-header">
               <h2>Delivery Details</h2>
               <div className="order-status-line">
@@ -506,9 +522,21 @@ const handleImageUpload = (e) => {
       {showFailedReasonModal && (
         <div className="modal-overlay">
           <div className="modal-content reason-modal">
-            <button className="close-btn" onClick={handleCancelFailure}>
-              X
-            </button>
+            <button className="close-btn" onClick={() => setSelectedOrder(null)}>
+  <svg 
+    width="24" 
+    height="24" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor"
+    strokeWidth="3" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
 
             <div className="modal-header">
               <h2>Reason for Failed Delivery</h2>
