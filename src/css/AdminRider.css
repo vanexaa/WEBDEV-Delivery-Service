@@ -116,16 +116,42 @@ button:hover {
   flex-direction: column;
   align-items: center;
   width: 90%;        
-  max-width: 3000px; 
+  max-width: 3000px;
+  position: relative;
 }
+
 .back-btn {
-  align-self: flex-start;
-  font-size: 40px;
-  color: #b9793b;
+  -webkit-appearance: none;  /* remove default button style */
+  -moz-appearance: none;
+  appearance: none;
+
+  position: fixed;
+  top: 20px;
+  left: 20px;
+
+  width: 25px;
+  height: 25px;
+  background: transparent;   /* transparent background */
+  border: none;
   cursor: pointer;
-  margin-bottom: 10px;
-  font-weight: bold;
-  margin-left: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  transition: transform 0.3s;
+}
+
+.back-btn:hover {
+  background: #6d5436;
+  transform: scale(1.05);
+}
+
+.back-btn::before {
+  display: block;
+  background: transparent;   /* ensure no white background */
+  color: inherit;            /* inherits #8B6F47 from button */
+  font-size: 24px;
+  line-height: 1;
 }
 
 .tabs {
@@ -135,6 +161,7 @@ button:hover {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
+  margin-top: 60px;
   flex-wrap: wrap;
   justify-content: center;
 }
@@ -263,7 +290,7 @@ button:hover {
   top: 15px;
   left: 15px;
   background: transparent;
-  color: #b9793b !important;
+  color: #8B6F47 !important;
   font-size: 24px;
   font-weight: bold;
   border: none;
@@ -274,7 +301,7 @@ button:hover {
 
 .close-btn:hover {
   background: transparent;
-  color: #8B6F47;          
+  color: #6d5436;          
   box-shadow: none;       
 }
 
@@ -385,7 +412,7 @@ button:hover {
 
 /* View Order Link Styles */
 .view-order-link {
-  color: #007bff;
+  color: #8B6F47;
   cursor: pointer;
   text-decoration: underline;
   font-weight: 500;
@@ -393,11 +420,11 @@ button:hover {
 }
 
 .view-order-link:hover {
-  color: #0056b3;
+  color: #6d5436;
   text-decoration: none;
 }
 
-/* Status Badge Styles */
+/* Status Badge Styles - Updated to match "mark as delivered" button color scheme */
 .status-badge {
   padding: 6px 12px;
   border-radius: 20px;
@@ -409,23 +436,23 @@ button:hover {
 }
 
 .status-delivered {
-  background-color: #d4edda;
-  color: #155724;
+  background-color: #8B6F47;
+  color: white;
 }
 
 .status-transit {
-  background-color: #cce5ff;
-  color: #004085;
+  background-color: #A88968;
+  color: white;
 }
 
 .status-preparing {
-  background-color: #fff3cd;
-  color: #856404;
+  background-color: #C4A57B;
+  color: white;
 }
 
 .status-pending {
-  background-color: #f8d7da;
-  color: #721c24;
+  background-color: #6d5436;
+  color: white;
 }
 
 /* Delivery Modal Specific Styles */
@@ -619,6 +646,13 @@ button:hover {
 
   .reason-btn {
     width: 100%;
+  }
+
+  .back-btn {
+    right: 5px;
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
   }
 }
 /* Container to hold the image and the hidden input */

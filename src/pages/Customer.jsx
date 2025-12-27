@@ -23,7 +23,8 @@ export default function Customer({ rider, eta, orders }) {
   const riderData = rider || defaultRider;
   const etaData = eta || "20 minutes";
   const ordersData = orders || defaultOrders;
-
+  const defaultLocation = " Sta. Mesa, Manila";
+  const newLocation = ""; 
   return (
     <div className="customer-page">
       <div className="customer-container">
@@ -41,7 +42,9 @@ export default function Customer({ rider, eta, orders }) {
               ["Phone Number", riderData.phone],
               ["Vehicle Type", riderData.vehicleType],
               ["Plate Number", riderData.plateNumber],
-              ["Payment Method", riderData.paymentMethod]
+              ["Payment Method", riderData.paymentMethod],
+              ["Default Address", defaultLocation],
+              ["Delivery Address", newLocation || "Using default address"]
             ].map(([label, value], idx) => (
               <div className="info-item" key={idx}>
                 <span className="info-label">{label}:</span>
@@ -59,10 +62,18 @@ export default function Customer({ rider, eta, orders }) {
               <p className="eta-title">Estimated Time of Arrival:</p>
               <p className="eta-time">{etaData}</p>
             </div>
+
+            <div className="location-box">
+              <p className="location-title"> ⚲ Delivery Location</p>
+              <p className="location-text">
+                {newLocation || defaultLocation}
+              </p>
+            </div>
+
           </div>
 
           <div className="order-summary-container">
-            <p className="order-title">📄 Order Summary:</p>
+            <p className="order-title">Order Summary:</p>
             <div className="order-scroll">
               {ordersData.map((order, index) => (
                 <p key={index}>

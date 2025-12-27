@@ -227,7 +227,7 @@ const handleImageUpload = (e) => {
       {currentView === "riders" && (
         <div className="rider-container">
           <div className="back-btn" onClick={() => setCurrentView("dashboard")}>
-            &laquo;
+            ←
           </div>
 <div className="tabs">
       {/* This is the active tab, clicking it keeps us here */}
@@ -295,7 +295,7 @@ const handleImageUpload = (e) => {
       {currentView === "deliveries" && (
         <div className="rider-container">
           <div className="back-btn" onClick={() => setCurrentView("dashboard")}>
-            &laquo;
+            ←
           </div>
 <div className="tabs">
       {/* This is the INACTIVE tab. Clicking it switches to 'riders' */}
@@ -373,7 +373,7 @@ const handleImageUpload = (e) => {
               className="close-btn"
               onClick={() => setSelectedRider(null)}
             >
-              ✖
+              X
             </button>
 
             <div className="modal-header">
@@ -446,7 +446,7 @@ const handleImageUpload = (e) => {
               className="close-btn"
               onClick={() => setSelectedOrder(null)}
             >
-              ✖
+              X
             </button>
 
             <div className="modal-header">
@@ -507,7 +507,7 @@ const handleImageUpload = (e) => {
         <div className="modal-overlay">
           <div className="modal-content reason-modal">
             <button className="close-btn" onClick={handleCancelFailure}>
-              ✖
+              X
             </button>
 
             <div className="modal-header">
