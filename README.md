@@ -1,7 +1,5 @@
 # WEBDEV-Delivery-Service — juysi-backend (Backend)
 
-✅ Branch: **juysi-backend**
-
 ## Overview
 This branch contains backend work for the Delivery Service project. Key changes include customer-facing APIs (ETA, rider info, feedback), service-layer additions, database entities and repositories, SQL seed scripts, EF Core migrations, and security/response shaping improvements.
 
@@ -60,19 +58,3 @@ This branch contains backend work for the Delivery Service project. Key changes 
 
 ## Tests and validation
 - No unit tests are included in this branch. Manual testing can be performed by running the app and using the endpoints above or importing `Backend/DatabaseScripts/test-customer_rating-feedback.sql` into the DB.
-
-## How to push this README to the branch
-```bash
-git checkout juysi-backend
-git add README.md
-git commit -m "docs: add README for juysi-backend"
-git push origin juysi-backend
-```
-
-## Next steps / Suggestions 💡
-- Add a small integration test suite for the newly added endpoints
-- Document environment variables and example `appsettings.Development.json` or `application.properties` if you add configuration files
-- Add scripts to automate DB seeding in dev mode
-
----
-If you'd like, I can open a PR draft for this branch with the README committed and pushed — say the word and I'll prepare and push the commit for you. ✅
