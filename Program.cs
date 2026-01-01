@@ -207,7 +207,7 @@ app.MapGet("/api/deliveries/{orderId}/track", async (int orderId, ApplicationDbC
         return Results.NotFound("Delivery not found.");
 
     // Simulate ETA & location (customize as needed)
-    var eta = delivery.Status switch
+    DateTime? eta = delivery.Status switch
     {
         "Assigned" => DateTime.UtcNow.AddMinutes(30),
         "PickedUp" => DateTime.UtcNow.AddMinutes(20),
@@ -224,6 +224,64 @@ app.MapGet("/api/deliveries/{orderId}/track", async (int orderId, ApplicationDbC
         Location = location
     });
 }).WithName("TrackDelivery");
+
+// ---------------------------
+// Customer-Facing Delivery Endpoints
+// ---------------------------
+
+// View rider contact details
+app.MapGet("/api/customers/{orderId}/rider", async (int orderId, ApplicationDbContext db) =>
+{
+    var delivery = await db.Deliveries.Include(d => d.Rider)
+        .FirstOrDefaultAsync(d => d.OrderId == orderId);
+    if (delivery == null || delivery.Rider == null)
+        return Results.NotFound("No rider assigned or delivery not found.");
+    var dto = new CustomerRiderDetailsDto {
+        RiderId = delivery.RiderId,
+        RiderName = delivery.Rider.Name,
+        RiderPhone = delivery.Rider.PhoneNumber
+    };
+    return Results.Ok(dto);
+}).WithName("GetCustomerRiderDetails");
+
+// View estimated arrival time
+app.MapGet("/api/customers/{orderId}/eta", async (int orderId, ApplicationDbContext db) =>
+{
+    var delivery = await db.Deliveries.FirstOrDefaultAsync(d => d.OrderId == orderId);
+    if (delivery == null)
+        return Results.NotFound("Delivery not found.");
+    // Simulate ETA based on status
+    DateTime? eta = delivery.Status switch {
+        "Assigned" => DateTime.UtcNow.AddMinutes(30),
+        "PickedUp" => DateTime.UtcNow.AddMinutes(20),
+        "InTransit" => DateTime.UtcNow.AddMinutes(10),
+        "Delivered" or "Failed" => delivery.UpdatedAt,
+        _ => null
+    };
+    var dto = new CustomerEtaDto { Eta = eta, Status = delivery.Status };
+    return Results.Ok(dto);
+}).WithName("GetCustomerEta");
+
+// Submit rider feedback
+app.MapPost("/api/customers/{orderId}/feedback", async (int orderId, CustomerFeedbackDto dto, ApplicationDbContext db) =>
+{
+    if (dto.Rating < 1 || dto.Rating > 5)
+        return Results.BadRequest("Rating must be 1-5.");
+    var delivery = await db.Deliveries.Include(d => d.Rider)
+        .FirstOrDefaultAsync(d => d.OrderId == orderId);
+    if (delivery == null || delivery.Rider == null)
+        return Results.NotFound("Delivery or rider not found.");
+    var feedback = new Feedback {
+        DeliveryId = delivery.DeliveryId,
+        RiderId = delivery.Rider.RiderId,
+        Rating = dto.Rating,
+        Comment = dto.Comment,
+        CreatedAt = DateTime.UtcNow
+    };
+    db.Feedbacks.Add(feedback);
+    await db.SaveChangesAsync();
+    return Results.Ok("Feedback submitted.");
+}).WithName("SubmitCustomerFeedback");
 
 // ---------------------------
 // Minimal API Endpoint
