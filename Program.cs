@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Ayawkomagbackend.Data;
+using Ayawkomagbackend.DTOs;
+using Ayawkomagbackend.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,9 +39,6 @@ if (app.Environment.IsDevelopment())
 // ---------------------------
 // Delivery Endpoints
 // ---------------------------
-
-using Ayawkomagbackend.DTOs;
-using Ayawkomagbackend.Models;
 
 // Assign a rider to an order
 app.MapPost("/api/deliveries/assign", async (AssignDeliveryDto dto, ApplicationDbContext db) =>
@@ -142,6 +141,89 @@ app.MapPut("/api/deliveries/{orderId}/reassign", async (int orderId, ReassignDel
     await db.SaveChangesAsync();
     return Results.Ok("Rider reassigned.");
 }).WithName("ReassignDelivery");
+
+// ---------------------------
+// Delivery Status Management Endpoints
+// ---------------------------
+
+// Update status (Picked-Up → In-Transit → Delivered/Failed)
+app.MapPut("/api/deliveries/{orderId}/status", async (int orderId, DeliveryStatusDto dto, ApplicationDbContext db) =>
+{
+    var delivery = await db.Deliveries.FirstOrDefaultAsync(d => d.OrderId == orderId);
+    if (delivery == null)
+        return Results.NotFound("Delivery not found.");
+    
+    var validStatuses = new[] { "PickedUp", "InTransit", "Delivered", "Failed" };
+    if (!validStatuses.Contains(dto.Status))
+        return Results.BadRequest("Invalid status.");
+    
+    delivery.Status = dto.Status;
+    delivery.UpdatedAt = DateTime.UtcNow;
+
+    db.StatusHistories.Add(new StatusHistory {
+        DeliveryId = delivery.DeliveryId,
+        Status = dto.Status,
+        Timestamp = DateTime.UtcNow,
+        ChangedBy = "rider/admin" // Optionally fill from auth system
+    });
+    await db.SaveChangesAsync();
+    return Results.Ok("Delivery status updated.");
+}).WithName("UpdateDeliveryStatus");
+
+// Mark delivery as failed with reason
+app.MapPut("/api/deliveries/{orderId}/failure", async (int orderId, DeliveryFailureDto dto, ApplicationDbContext db) =>
+{
+    var delivery = await db.Deliveries.FirstOrDefaultAsync(d => d.OrderId == orderId);
+    if (delivery == null)
+        return Results.NotFound("Delivery not found.");
+    if (string.IsNullOrWhiteSpace(dto.Reason))
+        return Results.BadRequest("Failure reason is required.");
+
+    delivery.Status = "Failed";
+    delivery.UpdatedAt = DateTime.UtcNow;
+
+    db.DeliveryFailures.Add(new DeliveryFailure {
+        DeliveryId = delivery.DeliveryId,
+        Reason = dto.Reason,
+        Timestamp = DateTime.UtcNow
+    });
+    db.StatusHistories.Add(new StatusHistory {
+        DeliveryId = delivery.DeliveryId,
+        Status = "Failed",
+        Timestamp = DateTime.UtcNow,
+        ChangedBy = "rider/admin"
+    });
+    await db.SaveChangesAsync();
+    return Results.Ok("Delivery marked as failed.");
+}).WithName("MarkDeliveryFailed");
+
+// Get delivery progress, ETA & location (simulated)
+app.MapGet("/api/deliveries/{orderId}/track", async (int orderId, ApplicationDbContext db) =>
+{
+    var delivery = await db.Deliveries
+        .Include(d => d.Rider)
+        .FirstOrDefaultAsync(d => d.OrderId == orderId);
+    if (delivery == null)
+        return Results.NotFound("Delivery not found.");
+
+    // Simulate ETA & location (customize as needed)
+    var eta = delivery.Status switch
+    {
+        "Assigned" => DateTime.UtcNow.AddMinutes(30),
+        "PickedUp" => DateTime.UtcNow.AddMinutes(20),
+        "InTransit" => DateTime.UtcNow.AddMinutes(10),
+        "Delivered" or "Failed" => delivery.UpdatedAt,
+        _ => null
+    };
+    var location = delivery.Status == "InTransit" ? "Near recipient address" : "Hub";
+
+    return Results.Ok(new {
+        delivery.DeliveryId,
+        delivery.Status,
+        Eta = eta,
+        Location = location
+    });
+}).WithName("TrackDelivery");
 
 // ---------------------------
 // Minimal API Endpoint
