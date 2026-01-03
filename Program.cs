@@ -284,6 +284,297 @@ app.MapPost("/api/customers/{orderId}/feedback", async (int orderId, CustomerFee
 }).WithName("SubmitCustomerFeedback");
 
 // ---------------------------
+// Seed Data Endpoint (for testing)
+// ---------------------------
+
+app.MapPost("/api/seed", async (ApplicationDbContext db) =>
+{
+    // Check if data already exists
+    if (await db.Users.AnyAsync() || await db.Riders.AnyAsync() || await db.Deliveries.AnyAsync())
+    {
+        return Results.BadRequest("Database already contains data. Clear existing data first if you want to reseed.");
+    }
+
+    // Create Users
+    var users = new List<User>
+    {
+        new User { Name = "John Doe", Email = "john.doe@example.com", PhoneNumber = "123-456-7890" },
+        new User { Name = "Jane Smith", Email = "jane.smith@example.com", PhoneNumber = "123-456-7891" },
+        new User { Name = "Bob Johnson", Email = "bob.johnson@example.com", PhoneNumber = "123-456-7892" },
+        new User { Name = "Alice Williams", Email = "alice.williams@example.com", PhoneNumber = "123-456-7893" }
+    };
+    db.Users.AddRange(users);
+    await db.SaveChangesAsync();
+
+    // Create Riders
+    var riders = new List<Rider>
+    {
+        new Rider { Name = "Mike Rider", Email = "mike.rider@example.com", PhoneNumber = "555-0101", IsAvailable = true },
+        new Rider { Name = "Sarah Driver", Email = "sarah.driver@example.com", PhoneNumber = "555-0102", IsAvailable = true },
+        new Rider { Name = "Tom Courier", Email = "tom.courier@example.com", PhoneNumber = "555-0103", IsAvailable = false },
+        new Rider { Name = "Lisa Delivery", Email = "lisa.delivery@example.com", PhoneNumber = "555-0104", IsAvailable = true }
+    };
+    db.Riders.AddRange(riders);
+    await db.SaveChangesAsync();
+
+    // Create Deliveries with various statuses
+    var deliveries = new List<Delivery>
+    {
+        // Pending delivery (no rider assigned)
+        new Delivery 
+        { 
+            OrderId = 1001, 
+            UserId = users[0].UserId, 
+            Status = "Pending", 
+            CreatedAt = DateTime.UtcNow.AddHours(-2),
+            UpdatedAt = DateTime.UtcNow.AddHours(-2)
+        },
+        // Assigned delivery
+        new Delivery 
+        { 
+            OrderId = 1002, 
+            UserId = users[1].UserId, 
+            RiderId = riders[0].RiderId,
+            Status = "Assigned", 
+            CreatedAt = DateTime.UtcNow.AddHours(-1),
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-30)
+        },
+        // Picked up delivery
+        new Delivery 
+        { 
+            OrderId = 1003, 
+            UserId = users[2].UserId, 
+            RiderId = riders[1].RiderId,
+            Status = "PickedUp", 
+            CreatedAt = DateTime.UtcNow.AddHours(-3),
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-15)
+        },
+        // In transit delivery
+        new Delivery 
+        { 
+            OrderId = 1004, 
+            UserId = users[3].UserId, 
+            RiderId = riders[0].RiderId,
+            Status = "InTransit", 
+            CreatedAt = DateTime.UtcNow.AddHours(-4),
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-5)
+        },
+        // Delivered delivery
+        new Delivery 
+        { 
+            OrderId = 1005, 
+            UserId = users[0].UserId, 
+            RiderId = riders[1].RiderId,
+            Status = "Delivered", 
+            CreatedAt = DateTime.UtcNow.AddDays(-1),
+            UpdatedAt = DateTime.UtcNow.AddDays(-1).AddHours(2)
+        },
+        // Failed delivery
+        new Delivery 
+        { 
+            OrderId = 1006, 
+            UserId = users[1].UserId, 
+            RiderId = riders[3].RiderId,
+            Status = "Failed", 
+            CreatedAt = DateTime.UtcNow.AddDays(-2),
+            UpdatedAt = DateTime.UtcNow.AddDays(-2).AddHours(1)
+        }
+    };
+    db.Deliveries.AddRange(deliveries);
+    await db.SaveChangesAsync();
+
+    // Create Delivery Assignments for assigned deliveries
+    var assignments = new List<DeliveryAssignment>
+    {
+        new DeliveryAssignment 
+        { 
+            DeliveryId = deliveries[1].DeliveryId, 
+            RiderId = riders[0].RiderId, 
+            AssignedAt = DateTime.UtcNow.AddHours(-1), 
+            IsActive = true 
+        },
+        new DeliveryAssignment 
+        { 
+            DeliveryId = deliveries[2].DeliveryId, 
+            RiderId = riders[1].RiderId, 
+            AssignedAt = DateTime.UtcNow.AddHours(-3), 
+            IsActive = true 
+        },
+        new DeliveryAssignment 
+        { 
+            DeliveryId = deliveries[3].DeliveryId, 
+            RiderId = riders[0].RiderId, 
+            AssignedAt = DateTime.UtcNow.AddHours(-4), 
+            IsActive = true 
+        },
+        new DeliveryAssignment 
+        { 
+            DeliveryId = deliveries[4].DeliveryId, 
+            RiderId = riders[1].RiderId, 
+            AssignedAt = DateTime.UtcNow.AddDays(-1), 
+            IsActive = false 
+        },
+        new DeliveryAssignment 
+        { 
+            DeliveryId = deliveries[5].DeliveryId, 
+            RiderId = riders[3].RiderId, 
+            AssignedAt = DateTime.UtcNow.AddDays(-2), 
+            IsActive = false 
+        }
+    };
+    db.DeliveryAssignments.AddRange(assignments);
+    await db.SaveChangesAsync();
+
+    // Create Status Histories
+    var statusHistories = new List<StatusHistory>
+    {
+        new StatusHistory { DeliveryId = deliveries[1].DeliveryId, Status = "Pending", Timestamp = DateTime.UtcNow.AddHours(-1), ChangedBy = "system" },
+        new StatusHistory { DeliveryId = deliveries[1].DeliveryId, Status = "Assigned", Timestamp = DateTime.UtcNow.AddMinutes(-30), ChangedBy = "admin" },
+        new StatusHistory { DeliveryId = deliveries[2].DeliveryId, Status = "Pending", Timestamp = DateTime.UtcNow.AddHours(-3), ChangedBy = "system" },
+        new StatusHistory { DeliveryId = deliveries[2].DeliveryId, Status = "Assigned", Timestamp = DateTime.UtcNow.AddHours(-2), ChangedBy = "admin" },
+        new StatusHistory { DeliveryId = deliveries[2].DeliveryId, Status = "PickedUp", Timestamp = DateTime.UtcNow.AddMinutes(-15), ChangedBy = "rider" },
+        new StatusHistory { DeliveryId = deliveries[3].DeliveryId, Status = "Pending", Timestamp = DateTime.UtcNow.AddHours(-4), ChangedBy = "system" },
+        new StatusHistory { DeliveryId = deliveries[3].DeliveryId, Status = "Assigned", Timestamp = DateTime.UtcNow.AddHours(-3), ChangedBy = "admin" },
+        new StatusHistory { DeliveryId = deliveries[3].DeliveryId, Status = "PickedUp", Timestamp = DateTime.UtcNow.AddHours(-2), ChangedBy = "rider" },
+        new StatusHistory { DeliveryId = deliveries[3].DeliveryId, Status = "InTransit", Timestamp = DateTime.UtcNow.AddMinutes(-5), ChangedBy = "rider" }
+    };
+    db.StatusHistories.AddRange(statusHistories);
+    await db.SaveChangesAsync();
+
+    // Create a Delivery Failure for the failed delivery
+    var failure = new DeliveryFailure
+    {
+        DeliveryId = deliveries[5].DeliveryId,
+        Reason = "Customer address not found",
+        Timestamp = DateTime.UtcNow.AddDays(-2).AddHours(1)
+    };
+    db.DeliveryFailures.Add(failure);
+    await db.SaveChangesAsync();
+
+    // Create some Feedback
+    var feedbacks = new List<Feedback>
+    {
+        new Feedback 
+        { 
+            DeliveryId = deliveries[4].DeliveryId, 
+            RiderId = riders[1].RiderId, 
+            Rating = 5, 
+            Comment = "Excellent service! Very fast delivery.", 
+            CreatedAt = DateTime.UtcNow.AddDays(-1).AddHours(3) 
+        },
+        new Feedback 
+        { 
+            DeliveryId = deliveries[4].DeliveryId, 
+            RiderId = riders[1].RiderId, 
+            Rating = 4, 
+            Comment = "Good service, arrived on time.", 
+            CreatedAt = DateTime.UtcNow.AddDays(-1).AddHours(4) 
+        }
+    };
+    db.Feedbacks.AddRange(feedbacks);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new 
+    { 
+        message = "Test data seeded successfully!",
+        users = users.Count,
+        riders = riders.Count,
+        deliveries = deliveries.Count,
+        assignments = assignments.Count,
+        statusHistories = statusHistories.Count,
+        failures = 1,
+        feedbacks = feedbacks.Count
+    });
+}).WithName("SeedTestData");
+
+// ---------------------------
+// View Database Data Endpoint
+// ---------------------------
+
+app.MapGet("/api/database/view", async (ApplicationDbContext db) =>
+{
+    var users = await db.Users.ToListAsync();
+    var riders = await db.Riders.ToListAsync();
+    var deliveries = await db.Deliveries
+        .Include(d => d.Rider)
+        .Include(d => d.User)
+        .ToListAsync();
+    var assignments = await db.DeliveryAssignments
+        .Include(a => a.Rider)
+        .Include(a => a.Delivery)
+        .ToListAsync();
+    var statusHistories = await db.StatusHistories
+        .Include(s => s.Delivery)
+        .OrderBy(s => s.Timestamp)
+        .ToListAsync();
+    var failures = await db.DeliveryFailures
+        .Include(f => f.Delivery)
+        .ToListAsync();
+    var feedbacks = await db.Feedbacks
+        .Include(f => f.Rider)
+        .Include(f => f.Delivery)
+        .ToListAsync();
+
+    return Results.Ok(new
+    {
+        users = users.Select(u => new { u.UserId, u.Name, u.Email, u.PhoneNumber }),
+        riders = riders.Select(r => new { r.RiderId, r.Name, r.Email, r.PhoneNumber, r.IsAvailable }),
+        deliveries = deliveries.Select(d => new 
+        { 
+            d.DeliveryId, 
+            d.OrderId, 
+            d.Status, 
+            RiderName = d.Rider?.Name,
+            UserName = d.User?.Name,
+            d.CreatedAt, 
+            d.UpdatedAt 
+        }),
+        assignments = assignments.Select(a => new 
+        { 
+            a.AssignmentId, 
+            OrderId = a.Delivery?.OrderId,
+            RiderName = a.Rider?.Name,
+            a.AssignedAt, 
+            a.IsActive 
+        }),
+        statusHistories = statusHistories.Select(s => new 
+        { 
+            s.HistoryId, 
+            OrderId = s.Delivery?.OrderId,
+            s.Status, 
+            s.Timestamp, 
+            s.ChangedBy 
+        }),
+        failures = failures.Select(f => new 
+        { 
+            f.FailureId, 
+            OrderId = f.Delivery?.OrderId,
+            f.Reason, 
+            f.Timestamp 
+        }),
+        feedbacks = feedbacks.Select(f => new 
+        { 
+            f.FeedbackId, 
+            OrderId = f.Delivery?.OrderId,
+            RiderName = f.Rider?.Name,
+            f.Rating, 
+            f.Comment, 
+            f.CreatedAt 
+        }),
+        summary = new
+        {
+            totalUsers = users.Count,
+            totalRiders = riders.Count,
+            totalDeliveries = deliveries.Count,
+            totalAssignments = assignments.Count,
+            totalStatusHistories = statusHistories.Count,
+            totalFailures = failures.Count,
+            totalFeedbacks = feedbacks.Count
+        }
+    });
+}).WithName("ViewDatabaseData");
+
+// ---------------------------
 // Run the App
 // ---------------------------
 
