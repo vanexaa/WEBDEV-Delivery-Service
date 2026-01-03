@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "../css/AdminRider.css";
 import kapebaralogo from "/src/assets/kapebara logo.png";
+
+const API_BASE_URL = 'http://localhost:5292';
 
 function AdminRider() {
   const [currentView, setCurrentView] = useState("dashboard");
   const [selectedRider, setSelectedRider] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showFailedReasonModal, setShowFailedReasonModal] = useState(false);
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("All");
   const [failedReasons, setFailedReasons] = useState({
     customerUnavailable: false,
     wrongAddress: false,
@@ -15,37 +19,111 @@ function AdminRider() {
     other: false,
   });
   const [otherReason, setOtherReason] = useState("");
+  
+  // API data states
+  const [riders, setRiders] = useState([]);
+  const [allRiders, setAllRiders] = useState([]); // For reassignment dropdown
+  const [deliveries, setDeliveries] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Data for the riders
-  const [riders, setRiders] = useState([
-    {
-      id: 1,
-      name: "Jane Doe",
-      status: "Available",
-      riderId: "000100101",
-      phone: "0912-345-6789",
-      email: "jane.doe@email.com",
-      area: "North Caloocan",
-      avgTime: "15 mins",
-      vehicle: "Motorcycle",
-      plate: "ABC 1234",
-    },
-    {
-      id: 2,
-      name: "Mam A. Mo",
-      status: "Offline",
-      riderId: "000100102",
-      phone: "0998-765-4321",
-      email: "mam.a.mo@email.com",
-      area: "Quezon City",
-      avgTime: "20 mins",
-      vehicle: "Bicycle",
-      plate: "N/A",
-    },
-  ]);
+  // Fetch all deliveries
+  const fetchDeliveries = async (status = null) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const url = status && status !== "All" 
+        ? `${API_BASE_URL}/api/admin/deliveries?status=${status}`
+        : `${API_BASE_URL}/api/admin/deliveries`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        if (response.status === 404) {
+          setDeliveries([]);
+          return;
+        }
+        throw new Error(`Server error: ${response.status}`);
+      }
+      const data = await response.json();
+      setDeliveries(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // Check if it's a network error (backend not running)
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setError('Cannot connect to server. Please make sure the backend is running.');
+      } else {
+        setError(err.message);
+      }
+      console.error('Error fetching deliveries:', err);
+      setDeliveries([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Sample delivery data
-  const deliveries = [
+  // Fetch all riders
+  const fetchRiders = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/riders`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          setRiders([]);
+          setAllRiders([]);
+          return;
+        }
+        throw new Error(`Server error: ${response.status}`);
+      }
+      const data = await response.json();
+      // Transform API data to match component structure
+      const transformedRiders = data.map((r, index) => ({
+        id: r.riderId,
+        name: r.name,
+        status: r.isAvailable ? "Available" : "Offline",
+        riderId: r.riderId.toString().padStart(9, '0'),
+        phone: r.phoneNumber,
+        email: r.email,
+        area: "N/A", // Not in current model
+        avgTime: "N/A", // Not in current model
+        vehicle: "N/A", // Not in current model
+        plate: "N/A", // Not in current model
+        isAvailable: r.isAvailable
+      }));
+      setRiders(transformedRiders);
+      setAllRiders(data); // Keep original for reassignment
+    } catch (err) {
+      // Check if it's a network error (backend not running)
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setError('Cannot connect to server. Please make sure the backend is running.');
+      } else {
+        setError(err.message);
+      }
+      console.error('Error fetching riders:', err);
+      setRiders([]);
+      setAllRiders([]);
+    }
+  };
+
+  // Fetch delivery details
+  const fetchDeliveryDetails = async (orderId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/deliveries/${orderId}`);
+      if (!response.ok) throw new Error('Failed to fetch delivery details');
+      return await response.json();
+    } catch (err) {
+      console.error('Error fetching delivery details:', err);
+      return null;
+    }
+  };
+
+  // Load data on component mount and when view changes
+  useEffect(() => {
+    if (currentView === "deliveries") {
+      fetchDeliveries(statusFilter);
+    } else if (currentView === "riders") {
+      fetchRiders();
+    }
+  }, [currentView, statusFilter]);
+
+  // Sample delivery data (fallback)
+  const mockDeliveries = [
     {
       id: 1,
       orderId: "#12345",
@@ -109,15 +187,33 @@ function AdminRider() {
     switch (status) {
       case "Delivered":
         return "status-delivered";
+      case "InTransit":
       case "Ongoing":
         return "status-transit";
-      case "Preparing":
+      case "PickedUp":
         return "status-preparing";
+      case "Assigned":
+      case "Preparing":
       case "Pending":
         return "status-pending";
+      case "Failed":
+        return "status-failed";
       default:
         return "";
     }
+  };
+
+  // Format status for display
+  const formatStatus = (status) => {
+    const statusMap = {
+      "Assigned": "Assigned",
+      "PickedUp": "Picked Up",
+      "InTransit": "In Transit",
+      "Delivered": "Delivered",
+      "Failed": "Failed",
+      "Pending": "Pending"
+    };
+    return statusMap[status] || status;
   };
 
   const handleCheckboxChange = (reason) => {
@@ -127,40 +223,118 @@ function AdminRider() {
     }));
   };
 
-  const handleMarkAsDelivered = () => {
-    alert(`Order ${selectedOrder.orderId} marked as delivered!`);
-    setSelectedOrder(null);
+  // Mark delivery as delivered
+  const handleMarkAsDelivered = async () => {
+    if (!selectedOrder) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/deliveries/${selectedOrder.orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Delivered' })
+      });
+      if (!response.ok) throw new Error('Failed to mark as delivered');
+      await fetchDeliveries(statusFilter);
+      setSelectedOrder(null);
+      alert(`Order #${selectedOrder.orderId} marked as delivered!`);
+    } catch (err) {
+      alert('Failed to mark as delivered: ' + err.message);
+    }
   };
 
+  // Open failed reason modal
   const handleMarkAsFailed = () => {
     setShowFailedReasonModal(true);
   };
 
-  const handleConfirmFailure = () => {
+  // Confirm failure with reasons
+  const handleConfirmFailure = async () => {
+    if (!selectedOrder) return;
+    
     const selectedReasons = Object.keys(failedReasons).filter(
       (key) => failedReasons[key]
     );
+    
+    if (selectedReasons.length === 0) {
+      alert('Please select at least one reason for failure.');
+      return;
+    }
+    
     const reasonsList = selectedReasons.map((reason) => {
       if (reason === "other" && otherReason) {
         return `Other: ${otherReason}`;
       }
-      return reason;
+      // Format reason text
+      return reason.charAt(0).toUpperCase() + reason.slice(1).replace(/([A-Z])/g, ' $1').trim();
     });
-    alert(
-      `Order ${selectedOrder.orderId} marked as failed. Reasons: ${reasonsList.join(
-        ", "
-      )}`
-    );
-    setShowFailedReasonModal(false);
-    setSelectedOrder(null);
-    setFailedReasons({
-      customerUnavailable: false,
-      wrongAddress: false,
-      riderEmergency: false,
-      weatherIssue: false,
-      other: false,
-    });
-    setOtherReason("");
+    
+    const failureReason = reasonsList.join(", ");
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/deliveries/${selectedOrder.orderId}/failure`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: failureReason })
+      });
+      if (!response.ok) throw new Error('Failed to mark as failed');
+      await fetchDeliveries(statusFilter);
+      setShowFailedReasonModal(false);
+      setSelectedOrder(null);
+      setFailedReasons({
+        customerUnavailable: false,
+        wrongAddress: false,
+        riderEmergency: false,
+        weatherIssue: false,
+        other: false,
+      });
+      setOtherReason("");
+      alert(`Order #${selectedOrder.orderId} marked as failed.`);
+    } catch (err) {
+      alert('Failed to mark as failed: ' + err.message);
+    }
+  };
+
+  // Reassign rider
+  const handleReassignRider = async (newRiderId) => {
+    if (!selectedOrder) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/deliveries/${selectedOrder.orderId}/reassign`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newRiderId: newRiderId })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to reassign rider');
+      }
+      await fetchDeliveries(statusFilter);
+      setShowReassignModal(false);
+      setSelectedOrder(null);
+      alert(`Rider reassigned successfully!`);
+    } catch (err) {
+      alert('Failed to reassign rider: ' + err.message);
+    }
+  };
+
+  // Handle view order click
+  const handleViewOrder = async (delivery) => {
+    const details = await fetchDeliveryDetails(delivery.orderId);
+    if (details) {
+      setSelectedOrder({
+        ...delivery,
+        ...details,
+        customerName: details.customer?.name || delivery.customerName,
+        phone: details.customer?.phoneNumber || delivery.customerPhone,
+        address: "N/A", // Add if available in model
+        riderName: details.rider?.name || delivery.riderName,
+        riderPhone: details.rider?.phoneNumber || delivery.riderPhone,
+        items: "N/A", // Add if available in model
+        orderTime: new Date(delivery.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        eta: delivery.eta ? new Date(delivery.eta).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : "N/A",
+        amount: "N/A" // Add if available in model
+      });
+    } else {
+      setSelectedOrder(delivery);
+    }
   };
 
   const handleCancelFailure = () => {
@@ -203,18 +377,26 @@ const handleImageUpload = (e) => {
           <img src={kapebaralogo} alt="Kapebara Logo" className="logo" />
           <div className="card">
             <h2 className="title">Admin Dashboard</h2>
-            <div className="stats">
+            <div className="stats" style={{ display: 'flex', justifyContent: 'space-around', width: '100%', gap: '20px' }}>
               <div className="stat">
                 <div className="avatar"></div>
-                <p>Total Riders: 30</p>
-                <button onClick={() => setCurrentView("riders")}>
+                <p style={{ marginTop: '10px', fontWeight: 'bold' }}>Total Riders</p>
+                <p style={{ fontSize: '1.2rem', color: '#364152' }}>{riders.length || 'Loading...'}</p>
+                <button onClick={() => {
+                  fetchRiders();
+                  setCurrentView("riders");
+                }}>
                   View Riders
                 </button>
               </div>
               <div className="stat">
                 <div className="avatar"></div>
-                <p>Available Riders: 15</p>
-                <button onClick={() => setCurrentView("deliveries")}>
+                <p style={{ marginTop: '10px', fontWeight: 'bold' }}>Total Deliveries</p>
+                <p style={{ fontSize: '1.2rem', color: '#364152' }}>{deliveries.length || 'Loading...'}</p>
+                <button onClick={() => {
+                  fetchDeliveries();
+                  setCurrentView("deliveries");
+                }}>
                   View Deliveries
                 </button>
               </div>
@@ -316,51 +498,114 @@ const handleImageUpload = (e) => {
       </span>
     </div>
           <div className="list-card delivery-table-container">
-            <h2 style={{ marginBottom: "20px", color: "#364152" }}>
-              Delivery Management
-            </h2>
-
-            <div className="delivery-table-wrapper">
-              <table className="delivery-table">
-                <thead>
-                  <tr>
-                    <th>Order ID</th>
-                    <th>Customer Name</th>
-                    <th>Rider Assigned</th>
-                    <th>ETA</th>
-                    <th>Status</th>
-                    <th>View Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deliveries.map((delivery) => (
-                    <tr key={delivery.id}>
-                      <td className="order-id">{delivery.orderId}</td>
-                      <td>{delivery.customerName}</td>
-                      <td>{delivery.riderName}</td>
-                      <td>{delivery.eta}</td>
-                      <td>
-                        <span
-                          className={`status-badge ${getStatusClass(
-                            delivery.status
-                          )}`}
-                        >
-                          {delivery.status}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className="view-order-link"
-                          onClick={() => setSelectedOrder(delivery)}
-                        >
-                          View Order
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: "20px" }}>
+              <h2 style={{ margin: 0, color: "#364152" }}>
+                Delivery Management
+              </h2>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #ddd',
+                  fontSize: '0.9rem'
+                }}
+              >
+                <option value="All">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Assigned">Assigned</option>
+                <option value="PickedUp">Picked Up</option>
+                <option value="InTransit">In Transit</option>
+                <option value="Delivered">Delivered</option>
+                <option value="Failed">Failed</option>
+              </select>
             </div>
+
+            {error && (
+              <div style={{ 
+                padding: '12px', 
+                backgroundColor: '#f5e6d3', 
+                color: '#642f19', 
+                borderRadius: '4px', 
+                marginBottom: '20px',
+                border: '1px solid #aa6e39',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span>{error}</span>
+                <button 
+                  onClick={() => setError(null)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#642f19',
+                    cursor: 'pointer',
+                    fontSize: '1.2rem',
+                    padding: '0 8px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            {loading ? (
+              <div style={{ padding: '20px', textAlign: 'center' }}>Loading deliveries...</div>
+            ) : deliveries.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                No deliveries found.
+              </div>
+            ) : (
+              <div className="delivery-table-wrapper">
+                <table className="delivery-table">
+                  <thead>
+                    <tr>
+                      <th>Order ID</th>
+                      <th>Customer Name</th>
+                      <th>Rider Assigned</th>
+                      <th>ETA</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deliveries.map((delivery) => (
+                      <tr key={delivery.deliveryId}>
+                        <td className="order-id">#{delivery.orderId || delivery.deliveryId}</td>
+                        <td>{delivery.customerName || 'N/A'}</td>
+                        <td>{delivery.riderName || 'Unassigned'}</td>
+                        <td>
+                          {delivery.eta 
+                            ? new Date(delivery.eta).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                            : 'N/A'}
+                        </td>
+                        <td>
+                          <span
+                            className={`status-badge ${getStatusClass(
+                              delivery.status
+                            )}`}
+                          >
+                            {formatStatus(delivery.status)}
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            className="view-order-link"
+                            onClick={() => handleViewOrder(delivery)}
+                            style={{ cursor: 'pointer', marginRight: '10px' }}
+                          >
+                            View
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -438,8 +683,80 @@ const handleImageUpload = (e) => {
         </div>
       )}
 
+      {/* === REASSIGN RIDER MODAL === */}
+      {showReassignModal && selectedOrder && (
+        <div className="modal-overlay">
+          <div className="modal-content reason-modal">
+            <button className="close-btn" onClick={() => setShowReassignModal(false)}>
+              ✖
+            </button>
+
+            <div className="modal-header">
+              <h2>Reassign Rider</h2>
+              <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '10px' }}>
+                Order #{selectedOrder.orderId}
+              </p>
+            </div>
+
+            <div className="modal-body">
+              <div style={{ marginBottom: '20px' }}>
+                <p><strong>Current Rider:</strong> {selectedOrder.riderName || 'Unassigned'}</p>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
+                  Select New Rider:
+                </label>
+                <select
+                  id="rider-select"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '1rem'
+                  }}
+                >
+                  <option value="">-- Select a rider --</option>
+                  {allRiders
+                    .filter(r => r.isAvailable)
+                    .map((rider) => (
+                      <option key={rider.riderId} value={rider.riderId}>
+                        {rider.name} {rider.isAvailable ? '(Available)' : '(Unavailable)'}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="reason-action-buttons">
+                <button
+                  className="reason-btn confirm-btn"
+                  onClick={() => {
+                    const select = document.getElementById('rider-select');
+                    const newRiderId = parseInt(select.value);
+                    if (newRiderId) {
+                      handleReassignRider(newRiderId);
+                    } else {
+                      alert('Please select a rider');
+                    }
+                  }}
+                >
+                  Confirm Reassignment
+                </button>
+                <button
+                  className="reason-btn cancel-btn"
+                  onClick={() => setShowReassignModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* === ORDER DETAILS POPUP MODAL === */}
-      {selectedOrder && !showFailedReasonModal && (
+      {selectedOrder && !showFailedReasonModal && !showReassignModal && (
         <div className="modal-overlay">
           <div className="modal-content delivery-modal">
             <button
@@ -453,14 +770,14 @@ const handleImageUpload = (e) => {
               <h2>Delivery Details</h2>
               <div className="order-status-line">
                 <span className="order-id-display">
-                  Order ID: {selectedOrder.orderId}
+                  Order ID: #{selectedOrder.orderId || selectedOrder.deliveryId}
                 </span>
                 <span
                   className={`status-badge ${getStatusClass(
                     selectedOrder.status
                   )}`}
                 >
-                  Status: {selectedOrder.status}
+                  Status: {formatStatus(selectedOrder.status)}
                 </span>
               </div>
             </div>
@@ -494,6 +811,26 @@ const handleImageUpload = (e) => {
                     onClick={handleMarkAsFailed}
                   >
                     Mark as Delivery Failed
+                  </button>
+                  <button
+                    className="action-btn"
+                    onClick={() => {
+                      fetchRiders();
+                      setShowReassignModal(true);
+                    }}
+                    style={{
+                      backgroundColor: '#aa6e39',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      marginTop: '10px',
+                      width: '100%'
+                    }}
+                  >
+                    Reassign Rider
                   </button>
                 </div>
               </div>
