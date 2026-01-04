@@ -494,6 +494,126 @@ app.MapGet("/api/admin/riders", async (ApplicationDbContext db) =>
     return Results.Ok(riders);
 }).WithName("GetAllRiders");
 
+// Get all riders with load information
+app.MapGet("/api/admin/riders/load", async (ApplicationDbContext db) =>
+{
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    
+    var riders = await db.Riders
+        .Include(r => r.Deliveries)
+        .OrderBy(r => r.Name)
+        .ToListAsync();
+    
+    var ridersWithLoad = riders.Select(r => 
+    {
+        var currentLoad = r.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+        var maxLoad = 5; // Default max load, can be made configurable
+        var loadPercentage = maxLoad > 0 ? (currentLoad / (double)maxLoad) * 100 : 0;
+        
+        return new RiderLoadDto
+        {
+            RiderId = r.RiderId,
+            Name = r.Name,
+            Email = r.Email,
+            PhoneNumber = r.PhoneNumber,
+            IsAvailable = r.IsAvailable,
+            CurrentLoad = currentLoad,
+            MaxLoad = maxLoad,
+            LoadPercentage = Math.Round(loadPercentage, 1)
+        };
+    }).ToList();
+    
+    return Results.Ok(ridersWithLoad);
+}).WithName("GetRidersWithLoad");
+
+// Get rider load (current active deliveries count)
+app.MapGet("/api/riders/{riderId}/load", async (int riderId, ApplicationDbContext db) =>
+{
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == riderId);
+    
+    if (rider == null)
+        return Results.NotFound("Rider not found.");
+    
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+    var maxLoad = 5; // Default max load
+    var loadPercentage = maxLoad > 0 ? (currentLoad / (double)maxLoad) * 100 : 0;
+    
+    return Results.Ok(new
+    {
+        RiderId = rider.RiderId,
+        CurrentLoad = currentLoad,
+        MaxLoad = maxLoad,
+        LoadPercentage = Math.Round(loadPercentage, 1),
+        IsAvailable = rider.IsAvailable,
+        CanAcceptMore = rider.IsAvailable && currentLoad < maxLoad
+    });
+}).WithName("GetRiderLoad");
+
+// Auto-assign delivery to least loaded available rider
+app.MapPost("/api/deliveries/auto-assign", async (int orderId, ApplicationDbContext db) =>
+{
+    var delivery = await db.Deliveries.FirstOrDefaultAsync(d => d.OrderId == orderId);
+    if (delivery == null)
+        return Results.NotFound("Delivery not found.");
+    
+    if (delivery.RiderId != null)
+        return Results.BadRequest("Delivery already has a rider assigned.");
+    
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    const int maxLoad = 5;
+    
+    // Get all available riders with their current load
+    var riders = await db.Riders
+        .Include(r => r.Deliveries)
+        .Where(r => r.IsAvailable)
+        .ToListAsync();
+    
+    if (!riders.Any())
+        return Results.BadRequest("No available riders.");
+    
+    // Find riders with capacity (load < maxLoad)
+    var ridersWithCapacity = riders
+        .Select(r => new
+        {
+            Rider = r,
+            CurrentLoad = r.Deliveries.Count(d => ongoingStatuses.Contains(d.Status))
+        })
+        .Where(r => r.CurrentLoad < maxLoad)
+        .OrderBy(r => r.CurrentLoad) // Least loaded first
+        .ThenBy(r => r.Rider.Name) // Then by name for consistency
+        .ToList();
+    
+    if (!ridersWithCapacity.Any())
+        return Results.BadRequest("All available riders are at maximum capacity.");
+    
+    // Assign to least loaded rider
+    var selectedRider = ridersWithCapacity.First().Rider;
+    delivery.RiderId = selectedRider.RiderId;
+    delivery.Status = "Assigned";
+    delivery.UpdatedAt = DateTime.UtcNow;
+    
+    db.DeliveryAssignments.Add(new DeliveryAssignment
+    {
+        DeliveryId = delivery.DeliveryId,
+        RiderId = selectedRider.RiderId,
+        AssignedAt = DateTime.UtcNow,
+        IsActive = true
+    });
+    
+    await db.SaveChangesAsync();
+    
+    return Results.Ok(new
+    {
+        message = "Rider assigned successfully.",
+        riderId = selectedRider.RiderId,
+        riderName = selectedRider.Name,
+        currentLoad = ridersWithCapacity.First().CurrentLoad + 1
+    });
+}).WithName("AutoAssignDelivery");
+
 // Get failed deliveries
 app.MapGet("/api/admin/deliveries/failed", async (ApplicationDbContext db) =>
 {

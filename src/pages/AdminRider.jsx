@@ -59,10 +59,10 @@ function AdminRider() {
     }
   };
 
-  // Fetch all riders
+  // Fetch all riders with load information
   const fetchRiders = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/riders`);
+      const response = await fetch(`${API_BASE_URL}/api/admin/riders/load`);
       if (!response.ok) {
         if (response.status === 404) {
           setRiders([]);
@@ -84,10 +84,15 @@ function AdminRider() {
         avgTime: "N/A", // Not in current model
         vehicle: "N/A", // Not in current model
         plate: "N/A", // Not in current model
-        isAvailable: r.isAvailable
+        isAvailable: r.isAvailable,
+        currentLoad: r.currentLoad,
+        maxLoad: r.maxLoad,
+        loadPercentage: r.loadPercentage
       }));
       setRiders(transformedRiders);
-      setAllRiders(data); // Keep original for reassignment
+      // Keep original for reassignment (without load for dropdown)
+      const ridersForReassign = await fetch(`${API_BASE_URL}/api/admin/riders`).then(r => r.json()).catch(() => []);
+      setAllRiders(ridersForReassign);
     } catch (err) {
       // Check if it's a network error (backend not running)
       if (err.name === 'TypeError' && err.message.includes('fetch')) {
@@ -307,11 +312,31 @@ function AdminRider() {
         throw new Error(errorText || 'Failed to reassign rider');
       }
       await fetchDeliveries(statusFilter);
+      await fetchRiders(); // Refresh rider load
       setShowReassignModal(false);
       setSelectedOrder(null);
       alert(`Rider reassigned successfully!`);
     } catch (err) {
       alert('Failed to reassign rider: ' + err.message);
+    }
+  };
+
+  // Auto-assign delivery to least loaded rider
+  const handleAutoAssign = async (orderId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/deliveries/auto-assign?orderId=${orderId}`, {
+        method: 'POST'
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to auto-assign rider');
+      }
+      const data = await response.json();
+      await fetchDeliveries(statusFilter);
+      await fetchRiders(); // Refresh rider load
+      alert(`Delivery auto-assigned to ${data.riderName} (New Load: ${data.currentLoad})`);
+    } catch (err) {
+      alert('Failed to auto-assign: ' + err.message);
     }
   };
 
@@ -432,42 +457,96 @@ const handleImageUpload = (e) => {
           <div className="list-card">
             <div className="list-header">
               <span>Rider name</span>
+              <span>Load</span>
               <span>Availability</span>
             </div>
 
             <div className="riders-list">
-              {riders.map((rider) => (
-                <div key={rider.id} className="rider-row">
-                  <div className="rider-info">
-                    <div className="avatar-small">
-                      {/* Icon */}
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="#364152"
+              {riders.map((rider) => {
+                const loadColor = rider.loadPercentage >= 80 ? '#f44336' : 
+                                 rider.loadPercentage >= 50 ? '#ff9800' : 
+                                 '#4CAF50';
+                return (
+                  <div key={rider.id} className="rider-row">
+                    <div className="rider-info">
+                      <div className="avatar-small">
+                        {/* Icon */}
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="#364152"
+                        >
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                        </svg>
+                      </div>
+                      {/* Click Name to Open Popup */}
+                      <span
+                        className="rider-name"
+                        onClick={() => setSelectedRider(rider)}
                       >
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                      </svg>
+                        {rider.name}
+                      </span>
                     </div>
-                    {/* Click Name to Open Popup */}
-                    <span
-                      className="rider-name"
-                      onClick={() => setSelectedRider(rider)}
-                    >
-                      {rider.name}
-                    </span>
-                  </div>
 
-                  <div className="status-select">
-                    <select defaultValue={rider.status}>
-                      <option>Available</option>
-                      <option>On Delivery</option>
-                      <option>Break</option>
-                    </select>
+                    <div style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center',
+                      minWidth: '80px'
+                    }}>
+                      <div style={{ 
+                        fontWeight: 'bold', 
+                        color: loadColor,
+                        fontSize: '0.9rem'
+                      }}>
+                        {rider.currentLoad || 0}/{rider.maxLoad || 5}
+                      </div>
+                      <div style={{
+                        width: '60px',
+                        height: '6px',
+                        backgroundColor: '#e0e0e0',
+                        borderRadius: '3px',
+                        marginTop: '4px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${rider.loadPercentage || 0}%`,
+                          height: '100%',
+                          backgroundColor: loadColor,
+                          transition: 'width 0.3s ease'
+                        }}></div>
+                      </div>
+                    </div>
+
+                    <div className="status-select">
+                      <select 
+                        defaultValue={rider.status}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          const isAvailable = newStatus === "Available";
+                          try {
+                            const response = await fetch(`${API_BASE_URL}/api/riders/${rider.id}/availability`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ isAvailable })
+                            });
+                            if (response.ok) {
+                              await fetchRiders();
+                            }
+                          } catch (err) {
+                            console.error('Error updating availability:', err);
+                          }
+                        }}
+                      >
+                        <option value="Available">Available</option>
+                        <option value="On Delivery">On Delivery</option>
+                        <option value="Break">Break</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -592,13 +671,30 @@ const handleImageUpload = (e) => {
                           </span>
                         </td>
                         <td>
-                          <span
-                            className="view-order-link"
-                            onClick={() => handleViewOrder(delivery)}
-                            style={{ cursor: 'pointer', marginRight: '10px' }}
-                          >
-                            View
-                          </span>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            {!delivery.riderId && (
+                              <span
+                                className="view-order-link"
+                                onClick={() => handleAutoAssign(delivery.orderId)}
+                                style={{ 
+                                  cursor: 'pointer', 
+                                  color: '#aa6e39',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.85rem'
+                                }}
+                                title="Auto-assign to least loaded available rider"
+                              >
+                                Auto-Assign
+                              </span>
+                            )}
+                            <span
+                              className="view-order-link"
+                              onClick={() => handleViewOrder(delivery)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              View
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -669,6 +765,49 @@ const handleImageUpload = (e) => {
                 <h3>Work Info:</h3>
                 <p>- Assigned Area: {selectedRider.area}</p>
                 <p>- Delivery Time: {selectedRider.avgTime}</p>
+                <div style={{ 
+                  marginTop: '15px', 
+                  padding: '12px', 
+                  backgroundColor: '#f5f5f5', 
+                  borderRadius: '8px',
+                  border: '1px solid #e0e0e0'
+                }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem' }}>Current Load</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
+                      {selectedRider.currentLoad || 0} / {selectedRider.maxLoad || 5}
+                    </span>
+                    <span style={{ 
+                      color: (selectedRider.loadPercentage || 0) >= 80 ? '#f44336' : 
+                             (selectedRider.loadPercentage || 0) >= 50 ? '#ff9800' : '#4CAF50',
+                      fontWeight: 'bold'
+                    }}>
+                      {selectedRider.loadPercentage || 0}%
+                    </span>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    height: '10px',
+                    backgroundColor: '#e0e0e0',
+                    borderRadius: '5px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${selectedRider.loadPercentage || 0}%`,
+                      height: '100%',
+                      backgroundColor: (selectedRider.loadPercentage || 0) >= 80 ? '#f44336' : 
+                                     (selectedRider.loadPercentage || 0) >= 50 ? '#ff9800' : '#4CAF50',
+                      transition: 'width 0.3s ease'
+                    }}></div>
+                  </div>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#666' }}>
+                    {selectedRider.isAvailable && (selectedRider.currentLoad || 0) < (selectedRider.maxLoad || 5) 
+                      ? 'Can accept more deliveries' 
+                      : selectedRider.isAvailable 
+                        ? 'At maximum capacity' 
+                        : 'Currently unavailable'}
+                  </p>
+                </div>
               </div>
 
               <div className="info-section">
@@ -718,14 +857,20 @@ const handleImageUpload = (e) => {
                   }}
                 >
                   <option value="">-- Select a rider --</option>
-                  {allRiders
-                    .filter(r => r.isAvailable)
+                  {riders
+                    .filter(r => r.isAvailable && (r.currentLoad || 0) < (r.maxLoad || 5))
+                    .sort((a, b) => (a.currentLoad || 0) - (b.currentLoad || 0))
                     .map((rider) => (
-                      <option key={rider.riderId} value={rider.riderId}>
-                        {rider.name} {rider.isAvailable ? '(Available)' : '(Unavailable)'}
+                      <option key={rider.id} value={rider.id}>
+                        {rider.name} - Load: {rider.currentLoad || 0}/{rider.maxLoad || 5} ({rider.loadPercentage || 0}%)
                       </option>
                     ))}
                 </select>
+                {riders.filter(r => r.isAvailable && (r.currentLoad || 0) < (r.maxLoad || 5)).length === 0 && (
+                  <p style={{ color: '#f44336', fontSize: '0.85rem', marginTop: '8px' }}>
+                    No available riders with capacity
+                  </p>
+                )}
               </div>
 
               <div className="reason-action-buttons">
