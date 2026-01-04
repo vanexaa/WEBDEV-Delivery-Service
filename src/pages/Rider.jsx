@@ -1,7 +1,6 @@
-// src/App.jsx
 import React, { useState } from 'react';
-import { BsPerson } from 'react-icons/bs'; 
-import '../css/Rider.css'; 
+import { BsPerson } from 'react-icons/bs';
+import '../css/Rider.css';
 
 const ordersData = [
     { id: '123123', type: 'queue', customerName: 'Juan Dela Cruz', address: '101 Main St.', notes: 'Call upon arrival', items: '1x Espresso, 1x Pastel De Nata' },
@@ -10,178 +9,146 @@ const ordersData = [
     { id: '007', type: 'assigned', customerName: 'James Bond', status: 'In transit', address: 'Secret Lair, Manila', contact: '09XX-XXX-007', payment: 'Cash' },
 ];
 
-const OrderItem = ({ order, onClickView }) => (
-  <div className="order-item-row">
-    <span>Order #{order.id}</span>
-    <button 
-      className="btn-view-accept-custom"
-      onClick={() => onClickView(order)}
-    >
-      View
-    </button>
-  </div>
-);
+const Rider = () => {
+    const [isOnline, setIsOnline] = useState(true);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [showProfile, setShowProfile] = useState(false);
+    const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+    const [currentStatus, setCurrentStatus] = useState("In transit");
 
-const OrderQueueModal = ({ order, onClose, onAccept, onDecline }) => (
-  <div className="modal-overlay-new">
-    <div className="order-details-modal">
-        <div className="details-header">
-            <h3>Order #{order.id}</h3>
-            <span style={{ cursor: 'pointer', fontSize: '1.5rem', color: '#1a1a1a' }} onClick={onClose}>
-                ✖
-            </span>
-        </div>
-        <div className="details-content">
-            <p><strong>Customer Name:</strong> {order.customerName}</p>
-            <p>
-                <strong>Delivery Address:</strong> {order.address}
-                <span className="map-link">View Map</span>
-            </p>
-            <p><strong>Delivery Notes:</strong> {order.notes}</p>
-            
-            <div className="details-items">
-                <p><strong>Items:</strong> {order.items}</p>
-            </div>
-        </div>
-        
-        <div className="action-buttons-queue">
-            <button className="btn-decline-custom" onClick={onDecline}>Decline</button>
-            <button className="btn-accept-custom" onClick={onAccept}>Accept</button>
-        </div>
-    </div>
-  </div>
-);
+    const statusOptions = ["Picked Up", "In Transit", "Delivered", "Failed"];
 
-const AssignedOrderModal = ({ order, onClose, onDelivered }) => (
-    <div className="modal-overlay-new">
-        <div className="order-details-modal">
-            <div className="details-header">
-                <h3>Order Details</h3>
-                <span style={{ cursor: 'pointer', fontSize: '1.5rem', color: '#1a1a1a' }} onClick={onClose}>
-                    ✖
-                </span>
-            </div>
-            <div className="details-content">
-                <p><strong>Order #:</strong> {order.id}</p>
-                <p><strong>Status:</strong> {order.status}</p>
-                <p><strong>Customer:</strong> {order.customerName}</p>
-                <p><strong>Address:</strong> {order.address}</p>
-                <p><strong>Contact #:</strong> {order.contact}</p>
-                <p><strong>Payment Method:</strong> {order.payment}</p>
-                
-                <div style={{ padding: '10px', marginTop: '15px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: 'white' }}>
-                    <p style={{marginBottom: '5px', fontWeight: 'bold'}}>Update Status:</p>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                        <span>Picked Up</span>
-                        <span>In Transit</span>
-                        <span>Delivered</span>
-                        <span>Failed</span>
-                    </div>
+    const orderQueueData = ordersData.filter(o => o.type === 'queue');
+    const assignedOrdersData = ordersData.filter(o => o.type === 'assigned');
+
+    return (
+        <div className="app">
+            <div className="order-dashboard-container">
+                {/* Header: Profile and Toggle */}
+                <div className="top-header-section">
+                    <BsPerson className="profile-icon" onClick={() => setShowProfile(true)} style={{ cursor: 'pointer' }} />
+                    <label className="rider-toggle">
+                        <input type="checkbox" checked={isOnline} onChange={() => setIsOnline(!isOnline)} />
+                        <span className="slider"></span>
+                    </label>
                 </div>
-            </div>
-            
-            <button className="btn-delivery-action" onClick={onDelivered}>Order Delivered</button>
-        </div>
-    </div>
-);
 
-function Rider() {
-  const [isOnline, setIsOnline] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+                {/* Dashboard: Two Column Layout */}
+                <div className="dashboard-columns-container">
+                    <div className="order-card">
+                        <h2 className="order-card-title">Order Queue</h2>
+                        {orderQueueData.map(order => (
+                            <div className="order-item-row" key={order.id}>
+                                <span className="subheading">Order #{order.id}</span>
+                                <button className="btn-view-accept-custom" onClick={() => setSelectedOrder(order)}>View</button>
+                            </div>
+                        ))}
+                    </div>
 
-  const orderQueueData = ordersData.filter(o => o.type === 'queue');
-  const assignedOrdersData = ordersData.filter(o => o.type === 'assigned');
-
-  const handleViewClick = (order) => {
-    setSelectedOrder(order);
-  };
-  
-  const handleCloseModal = () => {
-    setSelectedOrder(null);
-  };
-
-  const handleAccept = () => {
-    alert(`Order ${selectedOrder.id} accepted!`);
-    handleCloseModal();
-  };
-
-  const handleDecline = () => {
-    alert(`Order ${selectedOrder.id} declined!`);
-    handleCloseModal();
-  };
-
-  const handleDelivered = () => {
-    alert(`Order ${selectedOrder.id} marked as delivered!`);
-    handleCloseModal();
-  };
-
-
-  return (
-    <div className="app">
-      <div className="order-dashboard-container">
-        
-        <div className="top-header-section">
-          <BsPerson className="profile-icon" />
-          <label className="rider-toggle">
-              <input 
-                type="checkbox" 
-                checked={isOnline}
-                onChange={() => setIsOnline(!isOnline)}
-              />
-              <span className="slider"></span>
-          </label>
-        </div>
-
-        <div style={{ display: 'flex', gap: '30px' }}>
-            <div style={{ flex: 1 }}>
-                <div className="order-card">
-                    <h3 className="order-card-title">Order Queue</h3>
-                    <div className="orders-list">
-                        {orderQueueData.map((order) => (
-                            <OrderItem 
-                                key={order.id} 
-                                order={order} 
-                                onClickView={handleViewClick} 
-                            />
+                    <div className="order-card">
+                        <h2 className="order-card-title">Assigned Orders</h2>
+                        {assignedOrdersData.map(order => (
+                            <div className="order-item-row" key={order.id}>
+                                <span className="subheading">Order #{order.id}</span>
+                                <button className="btn-view-accept-custom" onClick={() => setSelectedOrder(order)}>View</button>
+                            </div>
                         ))}
                     </div>
                 </div>
             </div>
-            <div style={{ flex: 1 }}>
-                <div className="order-card">
-                    <h3 className="order-card-title">Assigned Orders</h3>
-                    <div className="orders-list">
-                        {assignedOrdersData.map((order) => (
-                            <OrderItem 
-                                key={order.id} 
-                                order={order} 
-                                onClickView={handleViewClick} 
-                            />
-                        ))}
+
+            {/* POPUP: RIDER PROFILE */}
+            {showProfile && (
+                <div className="modal-overlay-new" onClick={() => setShowProfile(false)}>
+                    <div className="order-details-modal profile-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header-left">
+                            <button className="btn-close-brown" onClick={() => setShowProfile(false)}>✕</button>
+                        </div>
+                        <div className="profile-header">
+                            <div className="profile-icon-large"><BsPerson /></div>
+                            <div className="details-content subheading">
+                                <p><strong>NAME:</strong> Rider Name</p>
+                                <p><strong>RIDER #:</strong> 001</p>
+                                <p><strong>VEHICLE:</strong> Motorcycle</p>
+                                <p><strong>PLATE:</strong> ABC-1234</p>
+                                <button className="btn-decline-custom logout-btn">LOGOUT</button>
+                            </div>
+                        </div>
+                        <h2 className="order-card-title" style={{textAlign: 'center'}}>DELIVERY HISTORY</h2>
+                        <table className="history-table subheading">
+                            <thead>
+                                <tr><th>ORDER ID</th><th>CUSTOMER</th><th>DATE</th><th>STATUS</th><th>RATING</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>#123123</td><td>Juan Dela Cruz</td><td>01/01/26</td><td>Delivered</td><td>5/5</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
+            )}
+
+            {/* POPUP: ORDER QUEUE (New Request) */}
+            {selectedOrder && selectedOrder.type === 'queue' && (
+                <div className="modal-overlay-new" onClick={() => setSelectedOrder(null)}>
+                    <div className="order-details-modal rounded-50" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header-left">
+                            <button className="btn-close-brown" onClick={() => setSelectedOrder(null)}>✕</button>
+                        </div>
+                        <h2 className="order-card-title" style={{textAlign: 'center'}}>Order Details</h2>
+                        <div className="details-content subheading">
+                            <p>Order #{selectedOrder.id}</p>
+                            <p><strong>Customer Name:</strong> {selectedOrder.customerName}</p>
+                            <p><strong>Delivery Address:</strong> {selectedOrder.address}</p>
+                            <p><strong>Delivery Notes:</strong> {selectedOrder.notes}</p>
+                            <div className="details-items">
+                                <p><strong>Items:</strong></p>
+                                <p>{selectedOrder.items}</p>
+                            </div>
+                        </div>
+                        <div className="action-buttons-queue">
+                            <button className="btn-decline-custom pill-btn" onClick={() => setSelectedOrder(null)}>Decline</button>
+                            <button className="btn-accept-custom pill-btn" onClick={() => setSelectedOrder(null)}>Accept</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* POPUP: ASSIGNED DETAILS (Status Update) */}
+            {selectedOrder && selectedOrder.type === 'assigned' && (
+                <div className="modal-overlay-new" onClick={() => setSelectedOrder(null)}>
+                    <div className="order-details-modal rounded-40" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header-left">
+                            <button className="btn-close-brown" onClick={() => setSelectedOrder(null)}>✕</button>
+                        </div>
+                        <h2 className="order-card-title" style={{textAlign: 'center'}}>Order Details</h2>
+                        <div className="status-update-container subheading">
+                            <div className="details-content">
+                                <p>Order #{selectedOrder.id}</p>
+                                <p>Status: {currentStatus}</p>
+                                <p style={{ marginTop: '10px' }}><strong>Customer Info:</strong></p>
+                                <p>Name: {selectedOrder.customerName}</p>
+                                <p>Address: {selectedOrder.address}</p>
+                                <p>Contact: {selectedOrder.contact}</p>
+                                <p>Payment: {selectedOrder.payment}</p>
+                            </div>
+                            <div className="status-selection">
+                                <span style={{ fontSize: '0.8rem' }}>Update Status: </span>
+                                <div className="status-dropdown-trigger" onClick={() => setShowStatusDropdown(!showStatusDropdown)}>▼</div>
+                                {showStatusDropdown && (
+                                    <div className="status-dropdown-list">
+                                        {statusOptions.map(opt => (
+                                            <div key={opt} className="status-item" onClick={() => { setCurrentStatus(opt); setShowStatusDropdown(false); }}>{opt}</div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <button className="btn-delivery-action subheading" onClick={() => setSelectedOrder(null)}>Order Delivered</button>
+                    </div>
+                </div>
+            )}
         </div>
-      </div>
-      
-      {selectedOrder && selectedOrder.type === 'queue' && (
-          <OrderQueueModal
-              order={selectedOrder}
-              onClose={handleCloseModal}
-              onAccept={handleAccept}
-              onDecline={handleDecline}
-          />
-      )}
-      
-      {selectedOrder && selectedOrder.type === 'assigned' && (
-          <AssignedOrderModal
-              order={selectedOrder}
-              onClose={handleCloseModal}
-              onDelivered={handleDelivered}
-          />
-      )}
-    </div>
-  );
-}
+    );
+};
 
 export default Rider;
