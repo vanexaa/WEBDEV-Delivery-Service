@@ -302,13 +302,45 @@ app.MapPost("/api/customers/{orderId}/feedback", async (int orderId, CustomerFee
 // Rider-Facing Endpoints
 // ---------------------------
 
+// Get rider profile/details
+app.MapGet("/api/riders/{riderId}", async (int riderId, ApplicationDbContext db) =>
+{
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == riderId);
+    
+    if (rider == null)
+        return Results.NotFound("Rider not found.");
+    
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+    var maxLoad = 5; // Default max load
+    var loadPercentage = maxLoad > 0 ? (currentLoad / (double)maxLoad) * 100 : 0;
+    
+    var dto = new RiderProfileDto
+    {
+        RiderId = rider.RiderId,
+        Name = rider.Name,
+        Email = rider.Email,
+        PhoneNumber = rider.PhoneNumber,
+        IsAvailable = rider.IsAvailable,
+        CurrentLoad = currentLoad,
+        MaxLoad = maxLoad,
+        LoadPercentage = Math.Round(loadPercentage, 1),
+        CanAcceptMore = rider.IsAvailable && currentLoad < maxLoad
+    };
+    
+    return Results.Ok(dto);
+}).WithName("GetRiderProfile");
+
 // Get assigned orders for a rider
 app.MapGet("/api/riders/{riderId}/orders", async (int riderId, ApplicationDbContext db) =>
 {
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    
     var deliveries = await db.Deliveries
         .Include(d => d.User)
-        .Where(d => d.RiderId == riderId && 
-                   (d.Status == "Assigned" || d.Status == "PickedUp" || d.Status == "InTransit"))
+        .Where(d => d.RiderId == riderId && ongoingStatuses.Contains(d.Status))
         .OrderByDescending(d => d.CreatedAt)
         .Select(d => new RiderOrderDto
         {
@@ -316,24 +348,86 @@ app.MapGet("/api/riders/{riderId}/orders", async (int riderId, ApplicationDbCont
             OrderId = d.OrderId,
             Status = d.Status,
             CreatedAt = d.CreatedAt,
-            CustomerName = d.User.Name
+            UpdatedAt = d.UpdatedAt,
+            CustomerName = d.User.Name,
+            CustomerPhone = d.User.PhoneNumber,
+            Eta = d.Status switch
+            {
+                "Assigned" => DateTime.UtcNow.AddMinutes(30),
+                "PickedUp" => DateTime.UtcNow.AddMinutes(20),
+                "InTransit" => DateTime.UtcNow.AddMinutes(10),
+                _ => null
+            }
         })
         .ToListAsync();
     
-    return Results.Ok(deliveries);
+    // Also return rider's current load information
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == riderId);
+    
+    var currentLoad = rider != null ? rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status)) : 0;
+    var maxLoad = 5;
+    var loadPercentage = maxLoad > 0 ? (currentLoad / (double)maxLoad) * 100 : 0;
+    
+    return Results.Ok(new
+    {
+        Orders = deliveries,
+        LoadInfo = new
+        {
+            CurrentLoad = currentLoad,
+            MaxLoad = maxLoad,
+            LoadPercentage = Math.Round(loadPercentage, 1),
+            IsAvailable = rider?.IsAvailable ?? false,
+            CanAcceptMore = (rider?.IsAvailable ?? false) && currentLoad < maxLoad
+        }
+    });
 }).WithName("GetRiderOrders");
 
 // Update rider availability
 app.MapPut("/api/riders/{riderId}/availability", async (int riderId, RiderAvailabilityDto dto, ApplicationDbContext db) =>
 {
-    var rider = await db.Riders.FindAsync(riderId);
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == riderId);
+    
     if (rider == null)
         return Results.NotFound("Rider not found.");
+    
+    // Check load if trying to set unavailable while having active deliveries
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+    
+    // If setting to unavailable, warn if there are active deliveries (but allow it)
+    if (!dto.IsAvailable && currentLoad > 0)
+    {
+        // Allow but return warning
+        rider.IsAvailable = false;
+        await db.SaveChangesAsync();
+        return Results.Ok(new 
+        { 
+            message = "Availability updated. Warning: You have active deliveries.", 
+            isAvailable = rider.IsAvailable,
+            activeDeliveries = currentLoad
+        });
+    }
     
     rider.IsAvailable = dto.IsAvailable;
     await db.SaveChangesAsync();
     
-    return Results.Ok(new { message = "Availability updated.", isAvailable = rider.IsAvailable });
+    // Calculate load info for response
+    var maxLoad = 5;
+    var loadPercentage = maxLoad > 0 ? (currentLoad / (double)maxLoad) * 100 : 0;
+    
+    return Results.Ok(new 
+    { 
+        message = "Availability updated.", 
+        isAvailable = rider.IsAvailable,
+        currentLoad = currentLoad,
+        maxLoad = maxLoad,
+        loadPercentage = Math.Round(loadPercentage, 1),
+        canAcceptMore = rider.IsAvailable && currentLoad < maxLoad
+    });
 }).WithName("UpdateRiderAvailability");
 
 // Get delivery history for a rider

@@ -198,7 +198,19 @@ function Rider() {
         throw new Error(`Server error: ${response.status}`);
       }
       const data = await response.json();
-      setAssignedOrders(Array.isArray(data) ? data : []);
+      // Handle new response structure with Orders and LoadInfo
+      if (data.Orders && Array.isArray(data.Orders)) {
+        setAssignedOrders(data.Orders);
+        // Store load info if needed for display
+        if (data.LoadInfo) {
+          console.log('Rider Load Info:', data.LoadInfo);
+        }
+      } else if (Array.isArray(data)) {
+        // Fallback for old response format
+        setAssignedOrders(data);
+      } else {
+        setAssignedOrders([]);
+      }
     } catch (err) {
       // Check if it's a network error (backend not running)
       if (err.name === 'TypeError' && err.message.includes('fetch')) {
@@ -286,8 +298,17 @@ function Rider() {
         },
         body: JSON.stringify({ isAvailable: available }),
       });
-      if (!response.ok) throw new Error('Failed to update availability');
-      setIsOnline(available);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to update availability');
+      }
+      const data = await response.json();
+      setIsOnline(data.isAvailable);
+      
+      // Show warning if setting unavailable with active deliveries
+      if (data.activeDeliveries && data.activeDeliveries > 0) {
+        alert(`Warning: You have ${data.activeDeliveries} active delivery(ies). You've been marked as unavailable.`);
+      }
     } catch (err) {
       alert('Failed to update availability: ' + err.message);
       console.error('Error updating availability:', err);
