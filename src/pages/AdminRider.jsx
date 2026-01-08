@@ -76,18 +76,24 @@ function AdminRider() {
       const transformedRiders = data.map((r, index) => ({
         id: r.riderId,
         name: r.name,
-        status: r.isAvailable ? "Available" : "Offline",
+        status: r.availabilityStatus || (r.isAvailable ? "Available" : "Offline"),
         riderId: r.riderId.toString().padStart(9, '0'),
         phone: r.phoneNumber,
         email: r.email,
         area: "N/A", // Not in current model
         avgTime: "N/A", // Not in current model
-        vehicle: "N/A", // Not in current model
+        vehicle: r.vehicleType || "N/A",
         plate: "N/A", // Not in current model
         isAvailable: r.isAvailable,
         currentLoad: r.currentLoad,
-        maxLoad: r.maxLoad,
-        loadPercentage: r.loadPercentage
+        maxLoad: r.capacity || r.maxLoad || 5,
+        capacity: r.capacity || 5,
+        loadPercentage: r.loadPercentage,
+        ratingAvg: r.ratingAvg || 0,
+        blockedUntil: r.blockedUntil,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        availabilityStatus: r.availabilityStatus
       }));
       setRiders(transformedRiders);
       // Keep original for reassignment (without load for dropdown)
@@ -500,7 +506,7 @@ const handleImageUpload = (e) => {
                         color: loadColor,
                         fontSize: '0.9rem'
                       }}>
-                        {rider.currentLoad || 0}/{rider.maxLoad || 5}
+                        {rider.currentLoad || 0}/{rider.capacity || rider.maxLoad || 5}
                       </div>
                       <div style={{
                         width: '60px',
@@ -521,7 +527,7 @@ const handleImageUpload = (e) => {
 
                     <div className="status-select">
                       <select 
-                        defaultValue={rider.status}
+                        value={rider.availabilityStatus || rider.status}
                         onChange={async (e) => {
                           const newStatus = e.target.value;
                           const isAvailable = newStatus === "Available";
@@ -538,11 +544,23 @@ const handleImageUpload = (e) => {
                             console.error('Error updating availability:', err);
                           }
                         }}
+                        style={{
+                          color: rider.availabilityStatus === "Blocked" ? '#f44336' : 
+                                 rider.availabilityStatus === "Available" ? '#4CAF50' : '#666'
+                        }}
+                        disabled={rider.availabilityStatus === "Blocked"}
                       >
                         <option value="Available">Available</option>
-                        <option value="On Delivery">On Delivery</option>
-                        <option value="Break">Break</option>
+                        <option value="Unavailable">Unavailable</option>
+                        {rider.availabilityStatus === "Blocked" && (
+                          <option value="Blocked" disabled>Blocked</option>
+                        )}
                       </select>
+                      {rider.blockedUntil && new Date(rider.blockedUntil) > new Date() && (
+                        <div style={{ fontSize: '0.75rem', color: '#f44336', marginTop: '4px', textAlign: 'center' }}>
+                          Blocked until: {new Date(rider.blockedUntil).toLocaleString()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -765,6 +783,18 @@ const handleImageUpload = (e) => {
                 <h3>Work Info:</h3>
                 <p>- Assigned Area: {selectedRider.area}</p>
                 <p>- Delivery Time: {selectedRider.avgTime}</p>
+                <p>- Capacity: {selectedRider.capacity || selectedRider.maxLoad || 5} deliveries</p>
+                <p>- Availability Status: <span style={{ 
+                  color: selectedRider.availabilityStatus === "Blocked" ? '#f44336' : 
+                         selectedRider.availabilityStatus === "Available" ? '#4CAF50' : '#666',
+                  fontWeight: 'bold'
+                }}>{selectedRider.availabilityStatus || selectedRider.status}</span></p>
+                {selectedRider.blockedUntil && new Date(selectedRider.blockedUntil) > new Date() && (
+                  <p style={{ color: '#f44336' }}>
+                    - Blocked Until: {new Date(selectedRider.blockedUntil).toLocaleString()}
+                  </p>
+                )}
+                <p>- Average Rating: {selectedRider.ratingAvg ? `${selectedRider.ratingAvg.toFixed(1)} ⭐` : 'No ratings yet'}</p>
                 <div style={{ 
                   marginTop: '15px', 
                   padding: '12px', 
@@ -775,7 +805,7 @@ const handleImageUpload = (e) => {
                   <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem' }}>Current Load</h4>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
-                      {selectedRider.currentLoad || 0} / {selectedRider.maxLoad || 5}
+                      {selectedRider.currentLoad || 0} / {selectedRider.capacity || selectedRider.maxLoad || 5}
                     </span>
                     <span style={{ 
                       color: (selectedRider.loadPercentage || 0) >= 80 ? '#f44336' : 
@@ -801,19 +831,27 @@ const handleImageUpload = (e) => {
                     }}></div>
                   </div>
                   <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#666' }}>
-                    {selectedRider.isAvailable && (selectedRider.currentLoad || 0) < (selectedRider.maxLoad || 5) 
-                      ? 'Can accept more deliveries' 
-                      : selectedRider.isAvailable 
-                        ? 'At maximum capacity' 
-                        : 'Currently unavailable'}
+                    {selectedRider.availabilityStatus === "Blocked" 
+                      ? 'Currently blocked' 
+                      : selectedRider.isAvailable && (selectedRider.currentLoad || 0) < (selectedRider.capacity || selectedRider.maxLoad || 5) 
+                        ? 'Can accept more deliveries' 
+                        : selectedRider.isAvailable 
+                          ? 'At maximum capacity' 
+                          : 'Currently unavailable'}
                   </p>
                 </div>
               </div>
 
               <div className="info-section">
                 <h3>Vehicle Info:</h3>
-                <p>- Type: {selectedRider.vehicle}</p>
-                <p>- Plate: {selectedRider.plate}</p>
+                <p>- Type: {selectedRider.vehicle || selectedRider.vehicleType || 'N/A'}</p>
+                <p>- Plate: {selectedRider.plate || 'N/A'}</p>
+              </div>
+
+              <div className="info-section">
+                <h3>Account Info:</h3>
+                <p>- Created: {selectedRider.createdAt ? new Date(selectedRider.createdAt).toLocaleString() : 'N/A'}</p>
+                <p>- Last Updated: {selectedRider.updatedAt ? new Date(selectedRider.updatedAt).toLocaleString() : 'N/A'}</p>
               </div>
             </div>
             {/* === END OF MISSING BODY SECTION === */}

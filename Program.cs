@@ -66,11 +66,28 @@ app.MapPost("/api/deliveries/assign", async (AssignDeliveryDto dto, ApplicationD
     if (delivery == null)
         return Results.NotFound("Delivery not found for the specified OrderId.");
 
-    var rider = await db.Riders.FindAsync(dto.RiderId);
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == dto.RiderId);
+    
     if (rider == null)
         return Results.NotFound("Rider not found.");
+    
+    // Check if rider is blocked
+    var isBlocked = rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    if (isBlocked)
+        return Results.BadRequest($"Rider is blocked until {rider.BlockedUntil.Value:yyyy-MM-dd HH:mm:ss} UTC.");
+    
     if (!rider.IsAvailable)
         return Results.BadRequest("Rider is not available.");
+    
+    // Check capacity
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+    var capacity = rider.Capacity > 0 ? rider.Capacity : 5;
+    
+    if (currentLoad >= capacity)
+        return Results.BadRequest($"Rider is at maximum capacity ({currentLoad}/{capacity}).");
 
     // Assign
     delivery.RiderId = dto.RiderId;
@@ -130,11 +147,28 @@ app.MapPut("/api/deliveries/{orderId}/reassign", async (int orderId, ReassignDel
     if (delivery == null)
         return Results.NotFound("Delivery not found.");
 
-    var rider = await db.Riders.FindAsync(dto.NewRiderId);
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == dto.NewRiderId);
+    
     if (rider == null)
         return Results.NotFound("New rider not found.");
+    
+    // Check if rider is blocked
+    var isBlocked = rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    if (isBlocked)
+        return Results.BadRequest($"Rider is blocked until {rider.BlockedUntil.Value:yyyy-MM-dd HH:mm:ss} UTC.");
+    
     if (!rider.IsAvailable)
         return Results.BadRequest("New rider is not available.");
+    
+    // Check capacity
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+    var capacity = rider.Capacity > 0 ? rider.Capacity : 5;
+    
+    if (currentLoad >= capacity)
+        return Results.BadRequest($"New rider is at maximum capacity ({currentLoad}/{capacity}).");
 
     // Mark previous assignment inactive
     var assignments = db.DeliveryAssignments.Where(a => a.DeliveryId == delivery.DeliveryId && a.IsActive);
@@ -307,6 +341,7 @@ app.MapGet("/api/riders/{riderId}", async (int riderId, ApplicationDbContext db)
 {
     var rider = await db.Riders
         .Include(r => r.Deliveries)
+        .Include(r => r.Feedbacks)
         .FirstOrDefaultAsync(r => r.RiderId == riderId);
     
     if (rider == null)
@@ -314,8 +349,23 @@ app.MapGet("/api/riders/{riderId}", async (int riderId, ApplicationDbContext db)
     
     var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
     var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
-    var maxLoad = 5; // Default max load
-    var loadPercentage = maxLoad > 0 ? (currentLoad / (double)maxLoad) * 100 : 0;
+    var capacity = rider.Capacity > 0 ? rider.Capacity : 5; // Use rider's capacity or default
+    var loadPercentage = capacity > 0 ? (currentLoad / (double)capacity) * 100 : 0;
+    
+    // Calculate average rating
+    var ratingAvg = rider.Feedbacks.Any() 
+        ? rider.Feedbacks.Average(f => f.Rating) 
+        : 0.0;
+    
+    // Determine availability status
+    var isBlocked = rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    var availabilityStatus = isBlocked 
+        ? "Blocked" 
+        : rider.IsAvailable 
+            ? "Available" 
+            : "Unavailable";
+    
+    var canAcceptMore = !isBlocked && rider.IsAvailable && currentLoad < capacity;
     
     var dto = new RiderProfileDto
     {
@@ -323,11 +373,16 @@ app.MapGet("/api/riders/{riderId}", async (int riderId, ApplicationDbContext db)
         Name = rider.Name,
         Email = rider.Email,
         PhoneNumber = rider.PhoneNumber,
-        IsAvailable = rider.IsAvailable,
+        VehicleType = rider.VehicleType,
+        Capacity = capacity,
+        AvailabilityStatus = availabilityStatus,
         CurrentLoad = currentLoad,
-        MaxLoad = maxLoad,
+        RatingAvg = Math.Round(ratingAvg, 2),
+        BlockedUntil = rider.BlockedUntil,
+        CreatedAt = rider.CreatedAt,
+        UpdatedAt = rider.UpdatedAt,
         LoadPercentage = Math.Round(loadPercentage, 1),
-        CanAcceptMore = rider.IsAvailable && currentLoad < maxLoad
+        CanAcceptMore = canAcceptMore
     };
     
     return Results.Ok(dto);
@@ -367,8 +422,14 @@ app.MapGet("/api/riders/{riderId}/orders", async (int riderId, ApplicationDbCont
         .FirstOrDefaultAsync(r => r.RiderId == riderId);
     
     var currentLoad = rider != null ? rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status)) : 0;
-    var maxLoad = 5;
-    var loadPercentage = maxLoad > 0 ? (currentLoad / (double)maxLoad) * 100 : 0;
+    var capacity = rider != null && rider.Capacity > 0 ? rider.Capacity : 5;
+    var loadPercentage = capacity > 0 ? (currentLoad / (double)capacity) * 100 : 0;
+    var isBlocked = rider != null && rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    var availabilityStatus = isBlocked 
+        ? "Blocked" 
+        : rider?.IsAvailable == true 
+            ? "Available" 
+            : "Unavailable";
     
     return Results.Ok(new
     {
@@ -376,10 +437,11 @@ app.MapGet("/api/riders/{riderId}/orders", async (int riderId, ApplicationDbCont
         LoadInfo = new
         {
             CurrentLoad = currentLoad,
-            MaxLoad = maxLoad,
+            Capacity = capacity,
             LoadPercentage = Math.Round(loadPercentage, 1),
+            AvailabilityStatus = availabilityStatus,
             IsAvailable = rider?.IsAvailable ?? false,
-            CanAcceptMore = (rider?.IsAvailable ?? false) && currentLoad < maxLoad
+            CanAcceptMore = !isBlocked && (rider?.IsAvailable ?? false) && currentLoad < capacity
         }
     });
 }).WithName("GetRiderOrders");
@@ -416,17 +478,24 @@ app.MapPut("/api/riders/{riderId}/availability", async (int riderId, RiderAvaila
     await db.SaveChangesAsync();
     
     // Calculate load info for response
-    var maxLoad = 5;
-    var loadPercentage = maxLoad > 0 ? (currentLoad / (double)maxLoad) * 100 : 0;
+    var capacity = rider.Capacity > 0 ? rider.Capacity : 5;
+    var loadPercentage = capacity > 0 ? (currentLoad / (double)capacity) * 100 : 0;
+    var isBlocked = rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    var availabilityStatus = isBlocked 
+        ? "Blocked" 
+        : rider.IsAvailable 
+            ? "Available" 
+            : "Unavailable";
     
     return Results.Ok(new 
     { 
         message = "Availability updated.", 
         isAvailable = rider.IsAvailable,
+        availabilityStatus = availabilityStatus,
         currentLoad = currentLoad,
-        maxLoad = maxLoad,
+        capacity = capacity,
         loadPercentage = Math.Round(loadPercentage, 1),
-        canAcceptMore = rider.IsAvailable && currentLoad < maxLoad
+        canAcceptMore = !isBlocked && rider.IsAvailable && currentLoad < capacity
     });
 }).WithName("UpdateRiderAvailability");
 
@@ -595,14 +664,24 @@ app.MapGet("/api/admin/riders/load", async (ApplicationDbContext db) =>
     
     var riders = await db.Riders
         .Include(r => r.Deliveries)
+        .Include(r => r.Feedbacks)
         .OrderBy(r => r.Name)
         .ToListAsync();
     
     var ridersWithLoad = riders.Select(r => 
     {
         var currentLoad = r.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
-        var maxLoad = 5; // Default max load, can be made configurable
-        var loadPercentage = maxLoad > 0 ? (currentLoad / (double)maxLoad) * 100 : 0;
+        var capacity = r.Capacity > 0 ? r.Capacity : 5;
+        var loadPercentage = capacity > 0 ? (currentLoad / (double)capacity) * 100 : 0;
+        var isBlocked = r.BlockedUntil.HasValue && r.BlockedUntil.Value > DateTime.UtcNow;
+        var availabilityStatus = isBlocked 
+            ? "Blocked" 
+            : r.IsAvailable 
+                ? "Available" 
+                : "Unavailable";
+        var ratingAvg = r.Feedbacks.Any() 
+            ? r.Feedbacks.Average(f => f.Rating) 
+            : 0.0;
         
         return new RiderLoadDto
         {
@@ -610,9 +689,15 @@ app.MapGet("/api/admin/riders/load", async (ApplicationDbContext db) =>
             Name = r.Name,
             Email = r.Email,
             PhoneNumber = r.PhoneNumber,
+            VehicleType = r.VehicleType,
+            Capacity = capacity,
+            AvailabilityStatus = availabilityStatus,
             IsAvailable = r.IsAvailable,
             CurrentLoad = currentLoad,
-            MaxLoad = maxLoad,
+            RatingAvg = Math.Round(ratingAvg, 2),
+            BlockedUntil = r.BlockedUntil,
+            CreatedAt = r.CreatedAt,
+            UpdatedAt = r.UpdatedAt,
             LoadPercentage = Math.Round(loadPercentage, 1)
         };
     }).ToList();
@@ -632,17 +717,26 @@ app.MapGet("/api/riders/{riderId}/load", async (int riderId, ApplicationDbContex
     
     var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
     var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
-    var maxLoad = 5; // Default max load
-    var loadPercentage = maxLoad > 0 ? (currentLoad / (double)maxLoad) * 100 : 0;
+    var capacity = rider.Capacity > 0 ? rider.Capacity : 5;
+    var loadPercentage = capacity > 0 ? (currentLoad / (double)capacity) * 100 : 0;
+    var isBlocked = rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    var availabilityStatus = isBlocked 
+        ? "Blocked" 
+        : rider.IsAvailable 
+            ? "Available" 
+            : "Unavailable";
     
     return Results.Ok(new
     {
         RiderId = rider.RiderId,
         CurrentLoad = currentLoad,
-        MaxLoad = maxLoad,
+        Capacity = capacity,
         LoadPercentage = Math.Round(loadPercentage, 1),
+        AvailabilityStatus = availabilityStatus,
         IsAvailable = rider.IsAvailable,
-        CanAcceptMore = rider.IsAvailable && currentLoad < maxLoad
+        IsBlocked = isBlocked,
+        BlockedUntil = rider.BlockedUntil,
+        CanAcceptMore = !isBlocked && rider.IsAvailable && currentLoad < capacity
     });
 }).WithName("GetRiderLoad");
 
@@ -657,7 +751,6 @@ app.MapPost("/api/deliveries/auto-assign", async (int orderId, ApplicationDbCont
         return Results.BadRequest("Delivery already has a rider assigned.");
     
     var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
-    const int maxLoad = 5;
     
     // Get all available riders with their current load
     var riders = await db.Riders
@@ -668,20 +761,23 @@ app.MapPost("/api/deliveries/auto-assign", async (int orderId, ApplicationDbCont
     if (!riders.Any())
         return Results.BadRequest("No available riders.");
     
-    // Find riders with capacity (load < maxLoad)
+    // Filter out blocked riders and find riders with capacity
+    var now = DateTime.UtcNow;
     var ridersWithCapacity = riders
         .Select(r => new
         {
             Rider = r,
-            CurrentLoad = r.Deliveries.Count(d => ongoingStatuses.Contains(d.Status))
+            CurrentLoad = r.Deliveries.Count(d => ongoingStatuses.Contains(d.Status)),
+            Capacity = r.Capacity > 0 ? r.Capacity : 5,
+            IsBlocked = r.BlockedUntil.HasValue && r.BlockedUntil.Value > now
         })
-        .Where(r => r.CurrentLoad < maxLoad)
+        .Where(r => !r.IsBlocked && r.CurrentLoad < r.Capacity)
         .OrderBy(r => r.CurrentLoad) // Least loaded first
         .ThenBy(r => r.Rider.Name) // Then by name for consistency
         .ToList();
     
     if (!ridersWithCapacity.Any())
-        return Results.BadRequest("All available riders are at maximum capacity.");
+        return Results.BadRequest("All available riders are at maximum capacity or blocked.");
     
     // Assign to least loaded rider
     var selectedRider = ridersWithCapacity.First().Rider;
@@ -704,7 +800,8 @@ app.MapPost("/api/deliveries/auto-assign", async (int orderId, ApplicationDbCont
         message = "Rider assigned successfully.",
         riderId = selectedRider.RiderId,
         riderName = selectedRider.Name,
-        currentLoad = ridersWithCapacity.First().CurrentLoad + 1
+        currentLoad = ridersWithCapacity.First().CurrentLoad + 1,
+        capacity = ridersWithCapacity.First().Capacity
     });
 }).WithName("AutoAssignDelivery");
 
