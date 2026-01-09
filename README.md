@@ -1,174 +1,274 @@
-# Delivery Service Microservice
+# Delivery Management Microservice
 
-A complete microservice for managing deliveries, riders, and customer feedback for a Coffee Shop system.
+A comprehensive delivery management system built with ASP.NET Core 9.0 Minimal APIs, providing endpoints for delivery assignment, status tracking, rider management, and customer interactions.
 
-## Architecture
+## 🏗️ Architecture
 
 - **Backend**: ASP.NET Core 9.0 with Minimal APIs
 - **Database**: SQL Server with Entity Framework Core
-- **Frontend**: React 18 with Vite and Bootstrap 5
+- **Frontend**: React 18 with Vite and Bootstrap 5 (separate repository)
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-.
-├── DeliveryService/          # ASP.NET Core Backend
-│   ├── Models/              # Entity models
-│   ├── Data/                # DbContext
-│   ├── DTOs/                # Data Transfer Objects
-│   └── Program.cs           # Minimal API endpoints
-├── delivery-frontend/        # React Frontend
-│   ├── src/
-│   │   ├── components/      # React components
-│   │   └── services/        # API service layer
-│   └── package.json
-└── database/
-    └── schema.sql           # Database schema script
+WEBDEV-Delivery-Service/
+├── Ayawkomagbackend/
+│   ├── Models/              # Entity models (Rider, Delivery, Feedback, etc.)
+│   ├── Data/                # DbContext and database configuration
+│   └── DTOs/                # Data Transfer Objects for API requests/responses
+├── Migrations/              # EF Core database migrations
+├── Program.cs               # Minimal API endpoints and configuration
+└── appsettings.json        # Configuration (connection strings, etc.)
 ```
 
-## Prerequisites
+## 🚀 Getting Started
+
+### Prerequisites
 
 - .NET 9.0 SDK
-- SQL Server (LocalDB or SQL Server Express)
-- Node.js 18+ and npm
+- SQL Server (LocalDB or SQL Server Express/Full)
+- Visual Studio 2022 or VS Code (optional)
 
-## Setup Instructions
+### Installation
 
-### 1. Database Setup
-
-1. Open SQL Server Management Studio (SSMS) or use `sqlcmd`
-2. Run the script `database/schema.sql` to create the database and tables
-3. Verify the database `DeliveryServiceDB` is created with sample data
-
-### 2. Backend Setup
-
-1. Navigate to the `DeliveryService` directory:
+1. **Clone the repository**
    ```bash
-   cd DeliveryService
+   git clone <repository-url>
+   cd WEBDEV-Delivery-Service
    ```
 
-2. Restore packages:
-   ```bash
-   dotnet restore
-   ```
-
-3. Update the connection string in `appsettings.json` if needed:
+2. **Configure Database Connection**
+   - Update `appsettings.json` with your SQL Server connection string:
    ```json
-   "ConnectionStrings": {
-     "DefaultConnection": "Server=localhost;Database=DeliveryServiceDB;Trusted_Connection=True;TrustServerCertificate=True;"
+   {
+     "ConnectionStrings": {
+       "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=DeliveryServiceDb;Trusted_Connection=True;"
+     }
    }
    ```
 
-4. Run the backend:
+3. **Run Database Migrations**
    ```bash
-   dotnet run
+   dotnet ef database update --project WEBDEV-Delivery-Service
    ```
 
-   The API will be available at `http://localhost:5000` (or `https://localhost:5001`)
-
-5. Swagger UI will be available at `http://localhost:5000/swagger`
-
-### 3. Frontend Setup
-
-1. Navigate to the `delivery-frontend` directory:
+4. **Run the Application**
    ```bash
-   cd delivery-frontend
+   dotnet run --project WEBDEV-Delivery-Service
    ```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+5. **Access Swagger UI**
+   - Navigate to `http://localhost:5000/swagger` (or the port shown in your terminal)
 
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
+## 📚 API Endpoints
 
-   The frontend will be available at `http://localhost:5173`
+### Delivery Assignment & Tracking
 
-## API Endpoints
+#### Assign Rider to Order
+```http
+POST /api/deliveries/assign
+Content-Type: application/json
 
-### Delivery Management
+{
+  "orderId": 1,
+  "riderId": 2
+}
+```
 
-- `POST /api/deliveries/assign` - Assign a delivery to a rider
-- `GET /api/deliveries/{orderId}` - Get delivery details
-- `GET /api/deliveries/active` - Get all active deliveries
-- `PUT /api/deliveries/{orderId}/reassign` - Reassign delivery to another rider
-- `PUT /api/deliveries/{orderId}/status` - Update delivery status
-- `PUT /api/deliveries/{orderId}/failure` - Report delivery failure
-- `GET /api/deliveries/{orderId}/track` - Track delivery location
+#### Get Delivery Details
+```http
+GET /api/deliveries/{orderId}
+```
+
+#### Get Active Deliveries
+```http
+GET /api/deliveries/active
+```
+
+#### Reassign Delivery (Admin)
+```http
+PUT /api/deliveries/{orderId}/reassign
+Content-Type: application/json
+
+{
+  "newRiderId": 3
+}
+```
+
+### Delivery Status Management
+
+#### Update Delivery Status
+```http
+PUT /api/deliveries/{orderId}/status
+Content-Type: application/json
+
+{
+  "status": "PickedUp"  // Valid: PickedUp, InTransit, Delivered, Failed
+}
+```
+
+#### Mark Delivery as Failed
+```http
+PUT /api/deliveries/{orderId}/failure
+Content-Type: application/json
+
+{
+  "reason": "Customer address not found"
+}
+```
+
+#### Track Delivery (ETA & Location)
+```http
+GET /api/deliveries/{orderId}/track
+```
 
 ### Rider Management
 
-- `GET /api/riders/{riderId}` - Get rider profile
-- `GET /api/riders/{riderId}/orders` - Get rider's active orders
-- `PUT /api/riders/{riderId}/availability` - Toggle rider availability
-- `GET /api/riders/{riderId}/history` - Get rider's delivery history
-- `GET /api/riders/{riderId}/feedback` - Get rider's feedback ratings
+#### Get Rider Profile
+```http
+GET /api/riders/{riderId}
+```
 
-### Customer Facing
+#### Get Rider's Assigned Orders
+```http
+GET /api/riders/{riderId}/orders
+```
 
-- `GET /api/customers/{orderId}/rider` - Get rider contact information
-- `GET /api/customers/{orderId}/eta` - Get estimated arrival time
-- `POST /api/customers/{orderId}/feedback` - Submit delivery feedback
+#### Update Rider Availability
+```http
+PUT /api/riders/{riderId}/availability
+Content-Type: application/json
 
-## Frontend Views
+{
+  "isAvailable": true
+}
+```
 
-### 1. Customer Tracking View (`/`)
-- Enter Order ID to track delivery
-- View delivery status with progress bar
-- See rider information and contact details
-- View simulated map location
-- Submit feedback after delivery
+#### Get Rider Delivery History
+```http
+GET /api/riders/{riderId}/history
+```
 
-### 2. Rider Dashboard (`/rider`)
-- Toggle online/offline status
-- View assigned active orders
-- Update order status (Pickup, Start Transit, Mark Delivered)
-- Report delivery failures
-- Navigate to delivery location
+#### Get Rider Feedback
+```http
+GET /api/riders/{riderId}/feedback
+```
 
-### 3. Admin Dispatch (`/admin`)
-- View all active deliveries in a table
-- See rider availability status
-- Reassign deliveries to different riders
-- Monitor delivery statuses and ETAs
+### Customer-Facing Endpoints
 
-## Business Rules
+#### Get Rider Contact Details
+```http
+GET /api/customers/{orderId}/rider
+```
 
-1. **Rider Availability**: Riders cannot accept new orders when offline
-2. **ETA Generation**: When status changes to "InTransit", a random ETA (15-30 minutes) is generated
-3. **Feedback**: Can only be submitted for delivered orders, one feedback per delivery
-4. **Status Flow**: Assigned → PickedUp → InTransit → Delivered (or Failed/Cancelled)
+#### Get Delivery ETA
+```http
+GET /api/customers/{orderId}/eta
+```
 
-## Sample Data
+#### Submit Rider Feedback
+```http
+POST /api/customers/{orderId}/feedback
+Content-Type: application/json
 
-The database script includes sample data:
-- 3 Riders (John Rider, Sarah Driver, Mike Courier)
-- 2 Sample Deliveries (ORD-001, ORD-002)
+{
+  "rating": 5,
+  "comment": "Excellent service!"
+}
+```
 
-## Testing the Application
+## 🗄️ Database Models
 
-1. **Test Customer Tracking**:
-   - Navigate to Customer Tracking view
-   - Enter Order ID: `ORD-001` or `ORD-002`
-   - View delivery status and rider information
+### Core Entities
 
-2. **Test Rider Dashboard**:
-   - Navigate to Rider Dashboard
-   - Set Rider ID to `1`, `2`, or `3`
-   - Toggle availability and update order statuses
+- **Rider**: Delivery personnel with availability status
+- **Delivery**: Order delivery tracking with status history
+- **Feedback**: Customer ratings and comments for riders
+- **StatusHistory**: Audit trail of delivery status changes
+- **DeliveryFailure**: Records of failed deliveries with reasons
+- **DeliveryAssignment**: Assignment history of riders to deliveries
 
-3. **Test Admin Dispatch**:
-   - Navigate to Admin Dispatch
-   - View active deliveries
-   - Reassign deliveries to different riders
+## 🔐 Business Rules
 
-## Notes
+- Each order must be assigned to a single rider
+- Riders can update order status manually (PickedUp → InTransit → Delivered/Failed)
+- Admin can reassign deliveries in edge cases
+- Customers can view estimated delivery time and simulated map location
+- Delivery updates are manual or simulated, not real-time GPS tracking
 
-- The map integration uses placeholder images and Google Maps links
-- Location coordinates are simulated (stored as strings in format "lat,lng")
-- CORS is configured to allow requests from `localhost:5173` and `localhost:3000`
-- The backend uses Swagger for API documentation in development mode
+## 🧪 Testing
 
+### Using Swagger UI
+
+1. Start the application
+2. Navigate to `http://localhost:<port>/swagger`
+3. Use the interactive UI to test all endpoints
+
+### Using Postman/cURL
+
+Example cURL command:
+```bash
+curl -X POST "http://localhost:5000/api/deliveries/assign" \
+  -H "Content-Type: application/json" \
+  -d '{"orderId": 1, "riderId": 2}'
+```
+
+## 📝 Status Values
+
+Valid delivery statuses:
+- `Pending` - Initial state
+- `Assigned` - Rider assigned
+- `PickedUp` - Rider picked up the order
+- `InTransit` - Order is on the way
+- `Delivered` - Successfully delivered
+- `Failed` - Delivery failed (with reason)
+
+## 🛠️ Development
+
+### Adding New Endpoints
+
+1. Create DTOs in `Ayawkomagbackend/DTOs/`
+2. Add endpoint in `Program.cs` using Minimal API syntax
+3. Implement validation and business logic
+4. Test via Swagger UI
+
+### Database Migrations
+
+```bash
+# Create a new migration
+dotnet ef migrations add <MigrationName> --project WEBDEV-Delivery-Service
+
+# Apply migrations
+dotnet ef database update --project WEBDEV-Delivery-Service
+```
+
+## 📦 Dependencies
+
+- `Microsoft.EntityFrameworkCore.SqlServer` - SQL Server provider
+- `Microsoft.EntityFrameworkCore.Tools` - EF Core tools
+- `Swashbuckle.AspNetCore` - Swagger/OpenAPI support
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 👥 Authors
+
+-
+
+## 🙏 Acknowledgments
+
+- ASP.NET Core team
+- Entity Framework Core team
+
+---
+
+**Note**: This is a microservice for delivery management. Ensure proper authentication and authorization are implemented before deploying to production.
