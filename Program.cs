@@ -13,6 +13,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "http://localhost:5174")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
 // EF Core DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
@@ -33,6 +45,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// CORS
+app.UseCors();
+
 // Optional HTTPS redirection
 // app.UseHttpsRedirection();
 
@@ -51,11 +66,28 @@ app.MapPost("/api/deliveries/assign", async (AssignDeliveryDto dto, ApplicationD
     if (delivery == null)
         return Results.NotFound("Delivery not found for the specified OrderId.");
 
-    var rider = await db.Riders.FindAsync(dto.RiderId);
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == dto.RiderId);
+    
     if (rider == null)
         return Results.NotFound("Rider not found.");
+    
+    // Check if rider is blocked
+    var isBlocked = rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    if (isBlocked)
+        return Results.BadRequest($"Rider is blocked until {rider.BlockedUntil.Value:yyyy-MM-dd HH:mm:ss} UTC.");
+    
     if (!rider.IsAvailable)
         return Results.BadRequest("Rider is not available.");
+    
+    // Check capacity
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+    var capacity = rider.Capacity > 0 ? rider.Capacity : 5;
+    
+    if (currentLoad >= capacity)
+        return Results.BadRequest($"Rider is at maximum capacity ({currentLoad}/{capacity}).");
 
     // Assign
     delivery.RiderId = dto.RiderId;
@@ -115,11 +147,28 @@ app.MapPut("/api/deliveries/{orderId}/reassign", async (int orderId, ReassignDel
     if (delivery == null)
         return Results.NotFound("Delivery not found.");
 
-    var rider = await db.Riders.FindAsync(dto.NewRiderId);
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == dto.NewRiderId);
+    
     if (rider == null)
         return Results.NotFound("New rider not found.");
+    
+    // Check if rider is blocked
+    var isBlocked = rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    if (isBlocked)
+        return Results.BadRequest($"Rider is blocked until {rider.BlockedUntil.Value:yyyy-MM-dd HH:mm:ss} UTC.");
+    
     if (!rider.IsAvailable)
         return Results.BadRequest("New rider is not available.");
+    
+    // Check capacity
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+    var capacity = rider.Capacity > 0 ? rider.Capacity : 5;
+    
+    if (currentLoad >= capacity)
+        return Results.BadRequest($"New rider is at maximum capacity ({currentLoad}/{capacity}).");
 
     // Mark previous assignment inactive
     var assignments = db.DeliveryAssignments.Where(a => a.DeliveryId == delivery.DeliveryId && a.IsActive);
@@ -284,295 +333,577 @@ app.MapPost("/api/customers/{orderId}/feedback", async (int orderId, CustomerFee
 }).WithName("SubmitCustomerFeedback");
 
 // ---------------------------
-// Seed Data Endpoint (for testing)
+// Rider-Facing Endpoints
 // ---------------------------
 
-app.MapPost("/api/seed", async (ApplicationDbContext db) =>
+// Get rider profile/details
+app.MapGet("/api/riders/{riderId}", async (int riderId, ApplicationDbContext db) =>
 {
-    // Check if data already exists
-    if (await db.Users.AnyAsync() || await db.Riders.AnyAsync() || await db.Deliveries.AnyAsync())
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .Include(r => r.Feedbacks)
+        .FirstOrDefaultAsync(r => r.RiderId == riderId);
+    
+    if (rider == null)
+        return Results.NotFound("Rider not found.");
+    
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+    var capacity = rider.Capacity > 0 ? rider.Capacity : 5; // Use rider's capacity or default
+    var loadPercentage = capacity > 0 ? (currentLoad / (double)capacity) * 100 : 0;
+    
+    // Calculate average rating
+    var ratingAvg = rider.Feedbacks.Any() 
+        ? rider.Feedbacks.Average(f => f.Rating) 
+        : 0.0;
+    
+    // Determine availability status
+    var isBlocked = rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    var availabilityStatus = isBlocked 
+        ? "Blocked" 
+        : rider.IsAvailable 
+            ? "Available" 
+            : "Unavailable";
+    
+    var canAcceptMore = !isBlocked && rider.IsAvailable && currentLoad < capacity;
+    
+    var dto = new RiderProfileDto
     {
-        return Results.BadRequest("Database already contains data. Clear existing data first if you want to reseed.");
-    }
-
-    // Create Users
-    var users = new List<User>
-    {
-        new User { Name = "John Doe", Email = "john.doe@example.com", PhoneNumber = "123-456-7890" },
-        new User { Name = "Jane Smith", Email = "jane.smith@example.com", PhoneNumber = "123-456-7891" },
-        new User { Name = "Bob Johnson", Email = "bob.johnson@example.com", PhoneNumber = "123-456-7892" },
-        new User { Name = "Alice Williams", Email = "alice.williams@example.com", PhoneNumber = "123-456-7893" }
+        RiderId = rider.RiderId,
+        Name = rider.Name,
+        Email = rider.Email,
+        PhoneNumber = rider.PhoneNumber,
+        VehicleType = rider.VehicleType,
+        Capacity = capacity,
+        AvailabilityStatus = availabilityStatus,
+        CurrentLoad = currentLoad,
+        RatingAvg = Math.Round(ratingAvg, 2),
+        BlockedUntil = rider.BlockedUntil,
+        CreatedAt = rider.CreatedAt,
+        UpdatedAt = rider.UpdatedAt,
+        LoadPercentage = Math.Round(loadPercentage, 1),
+        CanAcceptMore = canAcceptMore
     };
-    db.Users.AddRange(users);
-    await db.SaveChangesAsync();
+    
+    return Results.Ok(dto);
+}).WithName("GetRiderProfile");
 
-    // Create Riders
-    var riders = new List<Rider>
-    {
-        new Rider { Name = "Mike Rider", Email = "mike.rider@example.com", PhoneNumber = "555-0101", IsAvailable = true },
-        new Rider { Name = "Sarah Driver", Email = "sarah.driver@example.com", PhoneNumber = "555-0102", IsAvailable = true },
-        new Rider { Name = "Tom Courier", Email = "tom.courier@example.com", PhoneNumber = "555-0103", IsAvailable = false },
-        new Rider { Name = "Lisa Delivery", Email = "lisa.delivery@example.com", PhoneNumber = "555-0104", IsAvailable = true }
-    };
-    db.Riders.AddRange(riders);
-    await db.SaveChangesAsync();
-
-    // Create Deliveries with various statuses
-    var deliveries = new List<Delivery>
-    {
-        // Pending delivery (no rider assigned)
-        new Delivery 
-        { 
-            OrderId = 1001, 
-            UserId = users[0].UserId, 
-            Status = "Pending", 
-            CreatedAt = DateTime.UtcNow.AddHours(-2),
-            UpdatedAt = DateTime.UtcNow.AddHours(-2)
-        },
-        // Assigned delivery
-        new Delivery 
-        { 
-            OrderId = 1002, 
-            UserId = users[1].UserId, 
-            RiderId = riders[0].RiderId,
-            Status = "Assigned", 
-            CreatedAt = DateTime.UtcNow.AddHours(-1),
-            UpdatedAt = DateTime.UtcNow.AddMinutes(-30)
-        },
-        // Picked up delivery
-        new Delivery 
-        { 
-            OrderId = 1003, 
-            UserId = users[2].UserId, 
-            RiderId = riders[1].RiderId,
-            Status = "PickedUp", 
-            CreatedAt = DateTime.UtcNow.AddHours(-3),
-            UpdatedAt = DateTime.UtcNow.AddMinutes(-15)
-        },
-        // In transit delivery
-        new Delivery 
-        { 
-            OrderId = 1004, 
-            UserId = users[3].UserId, 
-            RiderId = riders[0].RiderId,
-            Status = "InTransit", 
-            CreatedAt = DateTime.UtcNow.AddHours(-4),
-            UpdatedAt = DateTime.UtcNow.AddMinutes(-5)
-        },
-        // Delivered delivery
-        new Delivery 
-        { 
-            OrderId = 1005, 
-            UserId = users[0].UserId, 
-            RiderId = riders[1].RiderId,
-            Status = "Delivered", 
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            UpdatedAt = DateTime.UtcNow.AddDays(-1).AddHours(2)
-        },
-        // Failed delivery
-        new Delivery 
-        { 
-            OrderId = 1006, 
-            UserId = users[1].UserId, 
-            RiderId = riders[3].RiderId,
-            Status = "Failed", 
-            CreatedAt = DateTime.UtcNow.AddDays(-2),
-            UpdatedAt = DateTime.UtcNow.AddDays(-2).AddHours(1)
-        }
-    };
-    db.Deliveries.AddRange(deliveries);
-    await db.SaveChangesAsync();
-
-    // Create Delivery Assignments for assigned deliveries
-    var assignments = new List<DeliveryAssignment>
-    {
-        new DeliveryAssignment 
-        { 
-            DeliveryId = deliveries[1].DeliveryId, 
-            RiderId = riders[0].RiderId, 
-            AssignedAt = DateTime.UtcNow.AddHours(-1), 
-            IsActive = true 
-        },
-        new DeliveryAssignment 
-        { 
-            DeliveryId = deliveries[2].DeliveryId, 
-            RiderId = riders[1].RiderId, 
-            AssignedAt = DateTime.UtcNow.AddHours(-3), 
-            IsActive = true 
-        },
-        new DeliveryAssignment 
-        { 
-            DeliveryId = deliveries[3].DeliveryId, 
-            RiderId = riders[0].RiderId, 
-            AssignedAt = DateTime.UtcNow.AddHours(-4), 
-            IsActive = true 
-        },
-        new DeliveryAssignment 
-        { 
-            DeliveryId = deliveries[4].DeliveryId, 
-            RiderId = riders[1].RiderId, 
-            AssignedAt = DateTime.UtcNow.AddDays(-1), 
-            IsActive = false 
-        },
-        new DeliveryAssignment 
-        { 
-            DeliveryId = deliveries[5].DeliveryId, 
-            RiderId = riders[3].RiderId, 
-            AssignedAt = DateTime.UtcNow.AddDays(-2), 
-            IsActive = false 
-        }
-    };
-    db.DeliveryAssignments.AddRange(assignments);
-    await db.SaveChangesAsync();
-
-    // Create Status Histories
-    var statusHistories = new List<StatusHistory>
-    {
-        new StatusHistory { DeliveryId = deliveries[1].DeliveryId, Status = "Pending", Timestamp = DateTime.UtcNow.AddHours(-1), ChangedBy = "system" },
-        new StatusHistory { DeliveryId = deliveries[1].DeliveryId, Status = "Assigned", Timestamp = DateTime.UtcNow.AddMinutes(-30), ChangedBy = "admin" },
-        new StatusHistory { DeliveryId = deliveries[2].DeliveryId, Status = "Pending", Timestamp = DateTime.UtcNow.AddHours(-3), ChangedBy = "system" },
-        new StatusHistory { DeliveryId = deliveries[2].DeliveryId, Status = "Assigned", Timestamp = DateTime.UtcNow.AddHours(-2), ChangedBy = "admin" },
-        new StatusHistory { DeliveryId = deliveries[2].DeliveryId, Status = "PickedUp", Timestamp = DateTime.UtcNow.AddMinutes(-15), ChangedBy = "rider" },
-        new StatusHistory { DeliveryId = deliveries[3].DeliveryId, Status = "Pending", Timestamp = DateTime.UtcNow.AddHours(-4), ChangedBy = "system" },
-        new StatusHistory { DeliveryId = deliveries[3].DeliveryId, Status = "Assigned", Timestamp = DateTime.UtcNow.AddHours(-3), ChangedBy = "admin" },
-        new StatusHistory { DeliveryId = deliveries[3].DeliveryId, Status = "PickedUp", Timestamp = DateTime.UtcNow.AddHours(-2), ChangedBy = "rider" },
-        new StatusHistory { DeliveryId = deliveries[3].DeliveryId, Status = "InTransit", Timestamp = DateTime.UtcNow.AddMinutes(-5), ChangedBy = "rider" }
-    };
-    db.StatusHistories.AddRange(statusHistories);
-    await db.SaveChangesAsync();
-
-    // Create a Delivery Failure for the failed delivery
-    var failure = new DeliveryFailure
-    {
-        DeliveryId = deliveries[5].DeliveryId,
-        Reason = "Customer address not found",
-        Timestamp = DateTime.UtcNow.AddDays(-2).AddHours(1)
-    };
-    db.DeliveryFailures.Add(failure);
-    await db.SaveChangesAsync();
-
-    // Create some Feedback
-    var feedbacks = new List<Feedback>
-    {
-        new Feedback 
-        { 
-            DeliveryId = deliveries[4].DeliveryId, 
-            RiderId = riders[1].RiderId, 
-            Rating = 5, 
-            Comment = "Excellent service! Very fast delivery.", 
-            CreatedAt = DateTime.UtcNow.AddDays(-1).AddHours(3) 
-        },
-        new Feedback 
-        { 
-            DeliveryId = deliveries[4].DeliveryId, 
-            RiderId = riders[1].RiderId, 
-            Rating = 4, 
-            Comment = "Good service, arrived on time.", 
-            CreatedAt = DateTime.UtcNow.AddDays(-1).AddHours(4) 
-        }
-    };
-    db.Feedbacks.AddRange(feedbacks);
-    await db.SaveChangesAsync();
-
-    return Results.Ok(new 
-    { 
-        message = "Test data seeded successfully!",
-        users = users.Count,
-        riders = riders.Count,
-        deliveries = deliveries.Count,
-        assignments = assignments.Count,
-        statusHistories = statusHistories.Count,
-        failures = 1,
-        feedbacks = feedbacks.Count
-    });
-}).WithName("SeedTestData");
-
-// ---------------------------
-// View Database Data Endpoint
-// ---------------------------
-
-app.MapGet("/api/database/view", async (ApplicationDbContext db) =>
+// Get assigned orders for a rider
+app.MapGet("/api/riders/{riderId}/orders", async (int riderId, ApplicationDbContext db) =>
 {
-    var users = await db.Users.ToListAsync();
-    var riders = await db.Riders.ToListAsync();
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    
     var deliveries = await db.Deliveries
-        .Include(d => d.Rider)
         .Include(d => d.User)
+        .Where(d => d.RiderId == riderId && ongoingStatuses.Contains(d.Status))
+        .OrderByDescending(d => d.CreatedAt)
+        .Select(d => new RiderOrderDto
+        {
+            DeliveryId = d.DeliveryId,
+            OrderId = d.OrderId,
+            Status = d.Status,
+            CreatedAt = d.CreatedAt,
+            UpdatedAt = d.UpdatedAt,
+            CustomerName = d.User.Name,
+            CustomerPhone = d.User.PhoneNumber,
+            Eta = null // Will be set below
+        })
         .ToListAsync();
-    var assignments = await db.DeliveryAssignments
-        .Include(a => a.Rider)
-        .Include(a => a.Delivery)
-        .ToListAsync();
-    var statusHistories = await db.StatusHistories
-        .Include(s => s.Delivery)
-        .OrderBy(s => s.Timestamp)
-        .ToListAsync();
-    var failures = await db.DeliveryFailures
-        .Include(f => f.Delivery)
-        .ToListAsync();
-    var feedbacks = await db.Feedbacks
-        .Include(f => f.Rider)
-        .Include(f => f.Delivery)
-        .ToListAsync();
+    
+    deliveries.ForEach(d =>
+    {
+        d.Eta = d.Status switch
+        {
+            "Assigned" => DateTime.UtcNow.AddMinutes(30),
+            "PickedUp" => DateTime.UtcNow.AddMinutes(20),
+            "InTransit" => DateTime.UtcNow.AddMinutes(10),
+            _ => null
+        };
+    });
 
+    // Also return rider's current load information
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == riderId);
+    
+    var currentLoad = rider != null ? rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status)) : 0;
+    var capacity = rider != null && rider.Capacity > 0 ? rider.Capacity : 5;
+    var loadPercentage = capacity > 0 ? (currentLoad / (double)capacity) * 100 : 0;
+    var isBlocked = rider != null && rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    var availabilityStatus = isBlocked 
+        ? "Blocked" 
+        : rider?.IsAvailable == true 
+            ? "Available" 
+            : "Unavailable";
+    
     return Results.Ok(new
     {
-        users = users.Select(u => new { u.UserId, u.Name, u.Email, u.PhoneNumber }),
-        riders = riders.Select(r => new { r.RiderId, r.Name, r.Email, r.PhoneNumber, r.IsAvailable }),
-        deliveries = deliveries.Select(d => new 
-        { 
-            d.DeliveryId, 
-            d.OrderId, 
-            d.Status, 
-            RiderName = d.Rider?.Name,
-            UserName = d.User?.Name,
-            d.CreatedAt, 
-            d.UpdatedAt 
-        }),
-        assignments = assignments.Select(a => new 
-        { 
-            a.AssignmentId, 
-            OrderId = a.Delivery?.OrderId,
-            RiderName = a.Rider?.Name,
-            a.AssignedAt, 
-            a.IsActive 
-        }),
-        statusHistories = statusHistories.Select(s => new 
-        { 
-            s.HistoryId, 
-            OrderId = s.Delivery?.OrderId,
-            s.Status, 
-            s.Timestamp, 
-            s.ChangedBy 
-        }),
-        failures = failures.Select(f => new 
-        { 
-            f.FailureId, 
-            OrderId = f.Delivery?.OrderId,
-            f.Reason, 
-            f.Timestamp 
-        }),
-        feedbacks = feedbacks.Select(f => new 
-        { 
-            f.FeedbackId, 
-            OrderId = f.Delivery?.OrderId,
-            RiderName = f.Rider?.Name,
-            f.Rating, 
-            f.Comment, 
-            f.CreatedAt 
-        }),
-        summary = new
+        Orders = deliveries,
+        LoadInfo = new
         {
-            totalUsers = users.Count,
-            totalRiders = riders.Count,
-            totalDeliveries = deliveries.Count,
-            totalAssignments = assignments.Count,
-            totalStatusHistories = statusHistories.Count,
-            totalFailures = failures.Count,
-            totalFeedbacks = feedbacks.Count
+            CurrentLoad = currentLoad,
+            Capacity = capacity,
+            LoadPercentage = Math.Round(loadPercentage, 1),
+            AvailabilityStatus = availabilityStatus,
+            IsAvailable = rider?.IsAvailable ?? false,
+            CanAcceptMore = !isBlocked && (rider?.IsAvailable ?? false) && currentLoad < capacity
         }
     });
-}).WithName("ViewDatabaseData");
+}).WithName("GetRiderOrders");
+
+// Update rider availability
+app.MapPut("/api/riders/{riderId}/availability", async (int riderId, RiderAvailabilityDto dto, ApplicationDbContext db) =>
+{
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == riderId);
+    
+    if (rider == null)
+        return Results.NotFound("Rider not found.");
+    
+    // Check load if trying to set unavailable while having active deliveries
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+    
+    // If setting to unavailable, warn if there are active deliveries (but allow it)
+    if (!dto.IsAvailable && currentLoad > 0)
+    {
+        // Allow but return warning
+        rider.IsAvailable = false;
+        await db.SaveChangesAsync();
+        return Results.Ok(new 
+        { 
+            message = "Availability updated. Warning: You have active deliveries.", 
+            isAvailable = rider.IsAvailable,
+            activeDeliveries = currentLoad
+        });
+    }
+    
+    rider.IsAvailable = dto.IsAvailable;
+    await db.SaveChangesAsync();
+    
+    // Calculate load info for response
+    var capacity = rider.Capacity > 0 ? rider.Capacity : 5;
+    var loadPercentage = capacity > 0 ? (currentLoad / (double)capacity) * 100 : 0;
+    var isBlocked = rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    var availabilityStatus = isBlocked 
+        ? "Blocked" 
+        : rider.IsAvailable 
+            ? "Available" 
+            : "Unavailable";
+    
+    return Results.Ok(new 
+    { 
+        message = "Availability updated.", 
+        isAvailable = rider.IsAvailable,
+        availabilityStatus = availabilityStatus,
+        currentLoad = currentLoad,
+        capacity = capacity,
+        loadPercentage = Math.Round(loadPercentage, 1),
+        canAcceptMore = !isBlocked && rider.IsAvailable && currentLoad < capacity
+    });
+}).WithName("UpdateRiderAvailability");
+
+// Get delivery history for a rider
+app.MapGet("/api/riders/{riderId}/history", async (int riderId, ApplicationDbContext db) =>
+{
+    var deliveries = await db.Deliveries
+        .Include(d => d.User)
+        .Include(d => d.Feedbacks)
+        .Where(d => d.RiderId == riderId && 
+                   (d.Status == "Delivered" || d.Status == "Failed"))
+        .OrderByDescending(d => d.UpdatedAt)
+        .ToListAsync();
+    
+    var history = deliveries.Select(d => 
+    {
+        var latestFeedback = d.Feedbacks.OrderByDescending(f => f.CreatedAt).FirstOrDefault();
+        return new RiderHistoryOrderDto
+        {
+            DeliveryId = d.DeliveryId,
+            OrderId = d.OrderId,
+            Status = d.Status,
+            DeliveredAt = d.UpdatedAt,
+            CustomerName = d.User.Name,
+            Rating = latestFeedback?.Rating,
+            Feedback = latestFeedback?.Comment
+        };
+    }).ToList();
+    
+    return Results.Ok(history);
+}).WithName("GetRiderHistory");
+
+// Get feedback summary for a rider
+app.MapGet("/api/riders/{riderId}/feedback", async (int riderId, ApplicationDbContext db) =>
+{
+    var feedbacks = await db.Feedbacks
+        .Where(f => f.RiderId == riderId)
+        .OrderByDescending(f => f.CreatedAt)
+        .ToListAsync();
+    
+    if (!feedbacks.Any())
+    {
+        return Results.Ok(new RiderFeedbackSummaryDto
+        {
+            AverageRating = 0,
+            Feedbacks = new List<FeedbackResponseDto>()
+        });
+    }
+    
+    var averageRating = feedbacks.Average(f => f.Rating);
+    var feedbackDtos = feedbacks.Select(f => new FeedbackResponseDto
+    {
+        FeedbackId = f.FeedbackId,
+        Rating = f.Rating,
+        Comment = f.Comment,
+        CreatedAt = f.CreatedAt
+    }).ToList();
+    
+    return Results.Ok(new RiderFeedbackSummaryDto
+    {
+        AverageRating = Math.Round(averageRating, 2),
+        Feedbacks = feedbackDtos
+    });
+}).WithName("GetRiderFeedback");
+
+// Get detailed order information for rider
+app.MapGet("/api/riders/{riderId}/orders/{orderId}", async (int riderId, int orderId, ApplicationDbContext db) =>
+{
+    var delivery = await db.Deliveries
+        .Include(d => d.User)
+        .Include(d => d.Rider)
+        .FirstOrDefaultAsync(d => d.OrderId == orderId && d.RiderId == riderId);
+    
+    if (delivery == null)
+        return Results.NotFound("Order not found or not assigned to this rider.");
+    
+    var dto = new DeliveryDetailsDto
+    {
+        DeliveryId = delivery.DeliveryId,
+        OrderId = delivery.OrderId,
+        RiderId = delivery.RiderId,
+        RiderName = delivery.Rider?.Name,
+        Status = delivery.Status,
+        CreatedAt = delivery.CreatedAt,
+        UpdatedAt = delivery.UpdatedAt,
+        CustomerAddress = null, // Add if you have address in User or Delivery model
+        Eta = delivery.Status switch
+        {
+            "Assigned" => DateTime.UtcNow.AddMinutes(30),
+            "PickedUp" => DateTime.UtcNow.AddMinutes(20),
+            "InTransit" => DateTime.UtcNow.AddMinutes(10),
+            _ => null
+        }
+    };
+    
+    return Results.Ok(dto);
+}).WithName("GetRiderOrderDetails");
+
+// ---------------------------
+// Admin-Facing Endpoints
+// ---------------------------
+
+// Get all deliveries for admin monitoring
+app.MapGet("/api/admin/deliveries", async (string? status, ApplicationDbContext db) =>
+{
+    var query = db.Deliveries
+        .Include(d => d.User)
+        .Include(d => d.Rider)
+        .AsQueryable();
+    
+    // Filter by status if provided
+    if (!string.IsNullOrEmpty(status) && status != "All")
+    {
+        query = query.Where(d => d.Status == status);
+    }
+    
+    var deliveries = await query
+        .OrderByDescending(d => d.CreatedAt)
+        .Select(d => new AdminDeliveryDto
+        {
+            DeliveryId = d.DeliveryId,
+            OrderId = d.OrderId,
+            Status = d.Status,
+            CreatedAt = d.CreatedAt,
+            UpdatedAt = d.UpdatedAt,
+            CustomerName = d.User.Name,
+            CustomerPhone = d.User.PhoneNumber,
+            RiderName = d.Rider != null ? d.Rider.Name : null,
+            RiderId = d.RiderId,
+            RiderPhone = d.Rider != null ? d.Rider.PhoneNumber : null,
+            Eta = null // Will be set below
+        })
+        .ToListAsync();
+    
+    deliveries.ForEach(d =>
+    {
+        d.Eta = CalculateEta(d.Status);
+    });
+
+
+    static DateTime? CalculateEta(string status) //helper method
+    {
+        return status switch
+        {
+            "Assigned"  => DateTime.UtcNow.AddMinutes(30),
+            "PickedUp"  => DateTime.UtcNow.AddMinutes(20),
+            "InTransit" => DateTime.UtcNow.AddMinutes(10),
+            _ => null
+        };
+    }
+
+    return Results.Ok(deliveries);
+}).WithName("GetAdminDeliveries");
+
+// Get all riders for admin (for reassignment dropdown)
+app.MapGet("/api/admin/riders", async (ApplicationDbContext db) =>
+{
+    var riders = await db.Riders
+        .OrderBy(r => r.Name)
+        .Select(r => new
+        {
+            r.RiderId,
+            r.Name,
+            r.Email,
+            r.PhoneNumber,
+            r.IsAvailable
+        })
+        .ToListAsync();
+    
+    return Results.Ok(riders);
+}).WithName("GetAllRiders");
+
+// Get all riders with load information
+app.MapGet("/api/admin/riders/load", async (ApplicationDbContext db) =>
+{
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    
+    var riders = await db.Riders
+        .Include(r => r.Deliveries)
+        .Include(r => r.Feedbacks)
+        .OrderBy(r => r.Name)
+        .ToListAsync();
+    
+    var ridersWithLoad = riders.Select(r => 
+    {
+        var currentLoad = r.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+        var capacity = r.Capacity > 0 ? r.Capacity : 5;
+        var loadPercentage = capacity > 0 ? (currentLoad / (double)capacity) * 100 : 0;
+        var isBlocked = r.BlockedUntil.HasValue && r.BlockedUntil.Value > DateTime.UtcNow;
+        var availabilityStatus = isBlocked 
+            ? "Blocked" 
+            : r.IsAvailable 
+                ? "Available" 
+                : "Unavailable";
+        var ratingAvg = r.Feedbacks.Any() 
+            ? r.Feedbacks.Average(f => f.Rating) 
+            : 0.0;
+        
+        return new RiderLoadDto
+        {
+            RiderId = r.RiderId,
+            Name = r.Name,
+            Email = r.Email,
+            PhoneNumber = r.PhoneNumber,
+            VehicleType = r.VehicleType,
+            Capacity = capacity,
+            AvailabilityStatus = availabilityStatus,
+            IsAvailable = r.IsAvailable,
+            CurrentLoad = currentLoad,
+            RatingAvg = Math.Round(ratingAvg, 2),
+            BlockedUntil = r.BlockedUntil,
+            CreatedAt = r.CreatedAt,
+            UpdatedAt = r.UpdatedAt,
+            LoadPercentage = Math.Round(loadPercentage, 1)
+        };
+    }).ToList();
+    
+    return Results.Ok(ridersWithLoad);
+}).WithName("GetRidersWithLoad");
+
+// Get rider load (current active deliveries count)
+app.MapGet("/api/riders/{riderId}/load", async (int riderId, ApplicationDbContext db) =>
+{
+    var rider = await db.Riders
+        .Include(r => r.Deliveries)
+        .FirstOrDefaultAsync(r => r.RiderId == riderId);
+    
+    if (rider == null)
+        return Results.NotFound("Rider not found.");
+    
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    var currentLoad = rider.Deliveries.Count(d => ongoingStatuses.Contains(d.Status));
+    var capacity = rider.Capacity > 0 ? rider.Capacity : 5;
+    var loadPercentage = capacity > 0 ? (currentLoad / (double)capacity) * 100 : 0;
+    var isBlocked = rider.BlockedUntil.HasValue && rider.BlockedUntil.Value > DateTime.UtcNow;
+    var availabilityStatus = isBlocked 
+        ? "Blocked" 
+        : rider.IsAvailable 
+            ? "Available" 
+            : "Unavailable";
+    
+    return Results.Ok(new
+    {
+        RiderId = rider.RiderId,
+        CurrentLoad = currentLoad,
+        Capacity = capacity,
+        LoadPercentage = Math.Round(loadPercentage, 1),
+        AvailabilityStatus = availabilityStatus,
+        IsAvailable = rider.IsAvailable,
+        IsBlocked = isBlocked,
+        BlockedUntil = rider.BlockedUntil,
+        CanAcceptMore = !isBlocked && rider.IsAvailable && currentLoad < capacity
+    });
+}).WithName("GetRiderLoad");
+
+// Auto-assign delivery to least loaded available rider
+app.MapPost("/api/deliveries/auto-assign", async (int orderId, ApplicationDbContext db) =>
+{
+    var delivery = await db.Deliveries.FirstOrDefaultAsync(d => d.OrderId == orderId);
+    if (delivery == null)
+        return Results.NotFound("Delivery not found.");
+    
+    if (delivery.RiderId != null)
+        return Results.BadRequest("Delivery already has a rider assigned.");
+    
+    var ongoingStatuses = new[] { "Assigned", "PickedUp", "InTransit" };
+    
+    // Get all available riders with their current load
+    var riders = await db.Riders
+        .Include(r => r.Deliveries)
+        .Where(r => r.IsAvailable)
+        .ToListAsync();
+    
+    if (!riders.Any())
+        return Results.BadRequest("No available riders.");
+    
+    // Filter out blocked riders and find riders with capacity
+    var now = DateTime.UtcNow;
+    var ridersWithCapacity = riders
+        .Select(r => new
+        {
+            Rider = r,
+            CurrentLoad = r.Deliveries.Count(d => ongoingStatuses.Contains(d.Status)),
+            Capacity = r.Capacity > 0 ? r.Capacity : 5,
+            IsBlocked = r.BlockedUntil.HasValue && r.BlockedUntil.Value > now
+        })
+        .Where(r => !r.IsBlocked && r.CurrentLoad < r.Capacity)
+        .OrderBy(r => r.CurrentLoad) // Least loaded first
+        .ThenBy(r => r.Rider.Name) // Then by name for consistency
+        .ToList();
+    
+    if (!ridersWithCapacity.Any())
+        return Results.BadRequest("All available riders are at maximum capacity or blocked.");
+    
+    // Assign to least loaded rider
+    var selectedRider = ridersWithCapacity.First().Rider;
+    delivery.RiderId = selectedRider.RiderId;
+    delivery.Status = "Assigned";
+    delivery.UpdatedAt = DateTime.UtcNow;
+    
+    db.DeliveryAssignments.Add(new DeliveryAssignment
+    {
+        DeliveryId = delivery.DeliveryId,
+        RiderId = selectedRider.RiderId,
+        AssignedAt = DateTime.UtcNow,
+        IsActive = true
+    });
+    
+    await db.SaveChangesAsync();
+    
+    return Results.Ok(new
+    {
+        message = "Rider assigned successfully.",
+        riderId = selectedRider.RiderId,
+        riderName = selectedRider.Name,
+        currentLoad = ridersWithCapacity.First().CurrentLoad + 1,
+        capacity = ridersWithCapacity.First().Capacity
+    });
+}).WithName("AutoAssignDelivery");
+
+// Get failed deliveries
+app.MapGet("/api/admin/deliveries/failed", async (ApplicationDbContext db) =>
+{
+    var failedDeliveries = await db.Deliveries
+        .Include(d => d.User)
+        .Include(d => d.Rider)
+        .Include(d => d.DeliveryFailures)
+        .Where(d => d.Status == "Failed")
+        .OrderByDescending(d => d.UpdatedAt)
+        .Select(d => new
+        {
+            DeliveryId = d.DeliveryId,
+            OrderId = d.OrderId,
+            CustomerName = d.User.Name,
+            CustomerPhone = d.User.PhoneNumber,
+            RiderName = d.Rider != null ? d.Rider.Name : null,
+            FailedAt = d.UpdatedAt,
+            FailureReason = d.DeliveryFailures.OrderByDescending(f => f.Timestamp).FirstOrDefault() != null
+                ? d.DeliveryFailures.OrderByDescending(f => f.Timestamp).FirstOrDefault()!.Reason
+                : "No reason provided"
+        })
+        .ToListAsync();
+    
+    return Results.Ok(failedDeliveries);
+}).WithName("GetFailedDeliveries");
+
+// Get delivery details for admin (with full info)
+app.MapGet("/api/admin/deliveries/{orderId}", async (int orderId, ApplicationDbContext db) =>
+{
+    var delivery = await db.Deliveries
+        .Include(d => d.User)
+        .Include(d => d.Rider)
+        .Include(d => d.DeliveryFailures)
+        .Include(d => d.StatusHistories)
+        .FirstOrDefaultAsync(d => d.OrderId == orderId);
+    
+    if (delivery == null)
+        return Results.NotFound("Delivery not found.");
+    
+    var dto = new
+    {
+        DeliveryId = delivery.DeliveryId,
+        OrderId = delivery.OrderId,
+        Status = delivery.Status,
+        CreatedAt = delivery.CreatedAt,
+        UpdatedAt = delivery.UpdatedAt,
+        Customer = new
+        {
+            Name = delivery.User.Name,
+            Email = delivery.User.Email,
+            PhoneNumber = delivery.User.PhoneNumber
+        },
+        Rider = delivery.Rider != null ? new
+        {
+            RiderId = delivery.Rider.RiderId,
+            Name = delivery.Rider.Name,
+            Email = delivery.Rider.Email,
+            PhoneNumber = delivery.Rider.PhoneNumber,
+            IsAvailable = delivery.Rider.IsAvailable
+        } : null,
+        FailureReason = delivery.DeliveryFailures.OrderByDescending(f => f.Timestamp).FirstOrDefault() != null
+            ? delivery.DeliveryFailures.OrderByDescending(f => f.Timestamp).FirstOrDefault()!.Reason
+            : null,
+        StatusHistory = delivery.StatusHistories
+            .OrderByDescending(s => s.Timestamp)
+            .Select(s => new
+            {
+                s.Status,
+                s.Timestamp,
+                s.ChangedBy
+            })
+            .ToList(),
+        Eta = delivery.Status switch
+        {
+            "Assigned" => DateTime.UtcNow.AddMinutes(30),
+            "PickedUp" => DateTime.UtcNow.AddMinutes(20),
+            "InTransit" => DateTime.UtcNow.AddMinutes(10),
+            _ => (DateTime?)null
+        }
+    };
+    
+    return Results.Ok(dto);
+}).WithName("GetAdminDeliveryDetails");
 
 // ---------------------------
 // Run the App
