@@ -1,0 +1,2 @@
+INSERT INTO Orders (CustomerId, CustomerName, CustomerPhone, DeliveryAddress, OrderTotal, PaymentMethod, Status, OrderDate)
+VALUES (1, 'John Doe', '09123456789', '123 Test Street, Manila', 500.00, 'GCash', 'Pending', GETDATE());
