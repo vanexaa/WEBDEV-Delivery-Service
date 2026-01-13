@@ -19,7 +19,7 @@ builder.Services.AddDbContext<CustomerDbContext>(options =>
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? "YourSuperSecretKeyForJWTTokenGeneration2024!";
+var secretKey = jwtSettings["SecretKey"] ?? "YourSuperSecretKeyForJWTTokenGeneration2024!MustBeAtLeast32Characters";
 var issuer = jwtSettings["Issuer"] ?? "AuthService";
 var audience = jwtSettings["Audience"] ?? "DeliveryService";
 
@@ -44,9 +44,9 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// Register services
+// Register HTTP client and services
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<ICustomerService>(sp =>
+builder.Services.AddScoped<ICustomerService, CustomerService.Services.CustomerService>(sp =>
 {
     var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
     var httpClient = httpClientFactory.CreateClient();

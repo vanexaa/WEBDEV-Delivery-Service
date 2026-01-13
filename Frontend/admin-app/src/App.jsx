@@ -8,12 +8,24 @@ import Navbar from './components/Navbar';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) {
-    // Redirect to unified-app login (assuming unified-app runs on port 3000)
-    window.location.href = 'http://localhost:3000/login';
-    return null;
+  const { loading } = useAuth();
+  
+  // Wait for authentication check to complete (but don't require authentication)
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center vh-100 bg-light">
+        <div className="text-center">
+          <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="text-muted">Loading...</p>
+        </div>
+      </div>
+    );
   }
+  
+  // Allow access regardless of authentication status
+  // Authentication is optional for admin app
   return children;
 };
 

@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using RiderService.Models.DTOs;
 using RiderService.Services;
-using System.Security.Claims;
 
 namespace RiderService.Controllers;
 
+/// <summary>
+/// Controller for managing rider operations including profile, availability, orders, and feedback.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
@@ -16,8 +19,8 @@ public class RidersController : ControllerBase
 
     public RidersController(IRiderService riderService, ILogger<RidersController> logger)
     {
-        _riderService = riderService;
-        _logger = logger;
+        _riderService = riderService ?? throw new ArgumentNullException(nameof(riderService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -118,27 +121,48 @@ public class RidersController : ControllerBase
     [Authorize(Roles = "Rider")]
     public async Task<ActionResult> UpdateRiderAvailability(int riderId, [FromBody] UpdateAvailabilityRequest request)
     {
+        if (riderId <= 0)
+        {
+            return BadRequest(new { message = "Invalid rider ID" });
+        }
+
+        if (request == null)
+        {
+            _logger.LogWarning("Update rider availability called with null request for RiderId={RiderId}", riderId);
+            return BadRequest(new { message = "Request body is required" });
+        }
+
         try
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
             {
-                return Unauthorized();
+                _logger.LogWarning("Invalid user ID claim in token");
+                return Unauthorized(new { message = "Invalid authentication token" });
             }
 
             // Verify rider owns this account
             var rider = await _riderService.GetRiderByUserIdAsync(userId);
             if (rider == null || rider.RiderId != riderId)
             {
+                _logger.LogWarning("Unauthorized attempt to update availability: UserId={UserId}, RiderId={RiderId}", 
+                    userId, riderId);
                 return Forbid();
             }
 
             var availability = await _riderService.UpdateRiderAvailabilityAsync(riderId, request);
+            if (availability == null)
+            {
+                return StatusCode(500, new { message = "Failed to update availability" });
+            }
+
+            _logger.LogInformation("Rider availability updated: RiderId={RiderId}, IsOnline={IsOnline}",
+                riderId, request.IsOnline);
             return Ok(availability);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating rider availability");
+            _logger.LogError(ex, "Error updating rider availability for RiderId={RiderId}", riderId);
             return StatusCode(500, new { message = "An error occurred" });
         }
     }

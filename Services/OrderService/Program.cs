@@ -8,22 +8,36 @@ using OrderService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Add services to the container
 builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
 
 // Configure Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
     ?? "Server=localhost;Database=OrderServiceDB;Trusted_Connection=True;TrustServerCertificate=True;";
+
 builder.Services.AddDbContext<OrderDbContext>(options =>
-    options.UseSqlServer(connectionString));
+{
+    options.UseSqlServer(connectionString, sqlOptions =>
+    {
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null);
+    });
+});
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? "YourSuperSecretKeyForJWTTokenGeneration2024!MustBeAtLeast32Characters";
+var secretKey = jwtSettings["SecretKey"] 
+    ?? "YourSuperSecretKeyForJWTTokenGeneration2024!MustBeAtLeast32Characters";
 var issuer = jwtSettings["Issuer"] ?? "AuthService";
-// Accept tokens with DeliveryService audience (same as AuthService generates)
-// In a real production system, you might want multiple audiences or disable audience validation
 var acceptedAudiences = new[] { "DeliveryService", "OrderService" };
+
+if (string.IsNullOrWhiteSpace(secretKey) || secretKey.Length < 32)
+{
+    throw new InvalidOperationException("JWT SecretKey must be at least 32 characters long.");
+}
 
 builder.Services.AddAuthentication(options =>
 {
@@ -40,20 +54,25 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = issuer,
         ValidAudiences = acceptedAudiences,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+        ClockSkew = TimeSpan.Zero
     };
 });
 
 builder.Services.AddAuthorization();
 
-// Register services
+// Register application services
 builder.Services.AddScoped<IOrderService, OrderService.Services.OrderService>();
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
+// Configure Swagger/OpenAPI
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Order Service API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo 
+    { 
+        Title = "Order Service API", 
+        Version = "v1",
+        Description = "Order management service for the Delivery Management System"
+    });
     
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -61,7 +80,8 @@ builder.Services.AddSwaggerGen(c =>
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Scheme = "Bearer",
+        BearerFormat = "JWT"
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -93,7 +113,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Automatically create database and tables if they don't exist
+// Initialize database
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -101,19 +121,26 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<OrderDbContext>();
         context.Database.EnsureCreated();
+        
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Database initialized successfully");
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred creating the database.");
+        logger.LogError(ex, "An error occurred while initializing the database.");
     }
 }
 
-// Configure the HTTP request pipeline.
+// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Order Service API v1");
+        c.RoutePrefix = string.Empty;
+    });
 }
 
 app.UseHttpsRedirection();

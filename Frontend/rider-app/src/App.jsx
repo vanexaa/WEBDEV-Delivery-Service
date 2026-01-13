@@ -23,9 +23,12 @@ const ProtectedRoute = ({ children }) => {
   // Wait for authentication check to complete
   if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center vh-100">
-        <div className="spinner-border" role="status">
-          <span className="visually-hidden">Loading...</span>
+      <div className="d-flex justify-content-center align-items-center vh-100 bg-light">
+        <div className="text-center">
+          <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="text-muted">Authenticating...</p>
         </div>
       </div>
     );
@@ -33,18 +36,53 @@ const ProtectedRoute = ({ children }) => {
   
   // If not authenticated
   if (!isAuthenticated) {
+    // Check for stored error info
+    const errorInfoStr = localStorage.getItem('authError');
+    const errorInfo = errorInfoStr ? JSON.parse(errorInfoStr) : null;
+    
     // If there was a token in URL but auth failed, show error (don't redirect to prevent loop)
     if (tokenInUrl) {
+      // Clear error info after displaying
+      if (errorInfo) {
+        localStorage.removeItem('authError');
+      }
+      
+      // Clear the token from URL to prevent re-processing
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
       return (
         <div className="d-flex justify-content-center align-items-center vh-100">
           <div className="alert alert-danger" style={{ maxWidth: '500px', margin: '20px' }}>
             <h5>Authentication Failed</h5>
-            <p>The authentication token is invalid or expired.</p>
-            <p>Please <a href="http://localhost:3000/login" onClick={() => {
-              // Clear unified-app's session when clicking login link
-              // Open unified-app in same window to clear its session
-              window.location.href = 'http://localhost:3000/login?clearSession=true';
-            }}>log in again</a></p>
+            {errorInfo && errorInfo.type === 'network' ? (
+              <>
+                <p><strong>Connection Error:</strong> {errorInfo.message}</p>
+                <p>Please ensure all backend services are running:</p>
+                <ul>
+                  <li>Auth Service: http://localhost:5001</li>
+                  <li>Rider Service: http://localhost:5005</li>
+                  <li>Delivery Service: http://localhost:5003</li>
+                </ul>
+                <p>You can start them using <code>start-backend.ps1</code> or manually with <code>dotnet run</code>.</p>
+              </>
+            ) : (
+              <>
+                <p>The authentication token is invalid or expired.</p>
+                <p>
+                  <button 
+                    className="btn btn-primary"
+                    onClick={() => {
+                      // Clear unified-app's session and redirect
+                      sessionStorage.clear();
+                      localStorage.clear();
+                      window.location.href = 'http://localhost:3000?clearSession=true';
+                    }}
+                  >
+                    Go to Login
+                  </button>
+                </p>
+              </>
+            )}
           </div>
         </div>
       );
@@ -56,7 +94,11 @@ const ProtectedRoute = ({ children }) => {
     if (!sessionStorage.getItem(redirectKey)) {
       sessionStorage.setItem(redirectKey, 'true');
       setTimeout(() => {
-        window.location.href = 'http://localhost:3000/login';
+        // Clear any auth data before redirecting
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        localStorage.removeItem('riderId');
+        window.location.href = 'http://localhost:3000';
       }, 100);
       return (
         <div className="d-flex justify-content-center align-items-center vh-100">
@@ -74,7 +116,18 @@ const ProtectedRoute = ({ children }) => {
       <div className="d-flex justify-content-center align-items-center vh-100">
         <div className="alert alert-danger" style={{ maxWidth: '500px', margin: '20px' }}>
           <h5>Authentication Required</h5>
-          <p>Please <a href="http://localhost:3000/login">log in</a> to continue.</p>
+          <p>
+            <button 
+              className="btn btn-primary"
+              onClick={() => {
+                sessionStorage.clear();
+                localStorage.clear();
+                window.location.href = 'http://localhost:3000';
+              }}
+            >
+              Go to Login
+            </button>
+          </p>
         </div>
       </div>
     );
