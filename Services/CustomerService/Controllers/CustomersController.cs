@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using CustomerService.Models.DTOs;
 using CustomerService.Services;
 
@@ -11,7 +9,6 @@ namespace CustomerService.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class CustomersController : ControllerBase
 {
     private readonly ICustomerService _customerService;
@@ -27,7 +24,7 @@ public class CustomersController : ControllerBase
     /// Get rider information for an order
     /// </summary>
     [HttpGet("{orderId}/rider")]
-    [Authorize(Roles = "Customer,Admin")]
+]
     public async Task<ActionResult> GetRiderInfo(int orderId)
     {
         try
@@ -51,7 +48,7 @@ public class CustomersController : ControllerBase
     /// Get estimated time of arrival (ETA) for an order
     /// </summary>
     [HttpGet("{orderId}/eta")]
-    [Authorize(Roles = "Customer,Admin")]
+]
     public async Task<ActionResult> GetETA(int orderId)
     {
         try
@@ -75,7 +72,7 @@ public class CustomersController : ControllerBase
     /// Submit feedback for a delivery
     /// </summary>
     [HttpPost("{orderId}/feedback")]
-    [Authorize(Roles = "Customer")]
+]
     public async Task<ActionResult> SubmitFeedback(int orderId, [FromBody] FeedbackRequest request)
     {
         if (orderId <= 0)
@@ -98,12 +95,8 @@ public class CustomersController : ControllerBase
 
         try
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int customerId))
-            {
-                _logger.LogWarning("Invalid user ID claim in token");
-                return Unauthorized(new { message = "Invalid authentication token" });
-            }
+            // Note: Authentication removed - customerId validation disabled
+            int customerId = 0; // Default value
 
             var result = await _customerService.SubmitFeedbackAsync(orderId, customerId, request);
             if (!result)

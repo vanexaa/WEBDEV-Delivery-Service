@@ -1,8 +1,5 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Text;
 using OrderService.Data;
 using OrderService.Services;
 
@@ -27,39 +24,6 @@ builder.Services.AddDbContext<OrderDbContext>(options =>
     });
 });
 
-// Configure JWT Authentication
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] 
-    ?? "YourSuperSecretKeyForJWTTokenGeneration2024!MustBeAtLeast32Characters";
-var issuer = jwtSettings["Issuer"] ?? "AuthService";
-var acceptedAudiences = new[] { "DeliveryService", "OrderService" };
-
-if (string.IsNullOrWhiteSpace(secretKey) || secretKey.Length < 32)
-{
-    throw new InvalidOperationException("JWT SecretKey must be at least 32 characters long.");
-}
-
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = issuer,
-        ValidAudiences = acceptedAudiences,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-        ClockSkew = TimeSpan.Zero
-    };
-});
-
-builder.Services.AddAuthorization();
 
 // Register application services
 builder.Services.AddScoped<IOrderService, OrderService.Services.OrderService>();
@@ -72,31 +36,6 @@ builder.Services.AddSwaggerGen(c =>
         Title = "Order Service API", 
         Version = "v1",
         Description = "Order management service for the Delivery Management System"
-    });
-    
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer",
-        BearerFormat = "JWT"
-    });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
     });
 });
 
@@ -145,8 +84,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
-app.UseAuthentication();
-app.UseAuthorization();
 app.MapControllers();
 
 app.Run();

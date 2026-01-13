@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using RiderService.Models.DTOs;
 using RiderService.Services;
 
@@ -11,7 +9,6 @@ namespace RiderService.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class RidersController : ControllerBase
 {
     private readonly IRiderService _riderService;
@@ -27,7 +24,7 @@ public class RidersController : ControllerBase
     /// Get rider by ID
     /// </summary>
     [HttpGet("{riderId}")]
-    [Authorize(Roles = "Rider,Admin")]
+]
     public async Task<ActionResult> GetRider(int riderId)
     {
         try
@@ -51,7 +48,7 @@ public class RidersController : ControllerBase
     /// Get rider profile with statistics
     /// </summary>
     [HttpGet("{riderId}/profile")]
-    [Authorize(Roles = "Rider,Admin")]
+]
     public async Task<ActionResult> GetRiderProfile(int riderId)
     {
         try
@@ -75,7 +72,7 @@ public class RidersController : ControllerBase
     /// Get rider orders (would integrate with Delivery Service)
     /// </summary>
     [HttpGet("{riderId}/orders")]
-    [Authorize(Roles = "Rider,Admin")]
+]
     public async Task<ActionResult> GetRiderOrders(int riderId)
     {
         try
@@ -94,7 +91,7 @@ public class RidersController : ControllerBase
     /// Get or update rider availability
     /// </summary>
     [HttpGet("{riderId}/availability")]
-    [Authorize(Roles = "Rider,Admin")]
+]
     public async Task<ActionResult> GetRiderAvailability(int riderId)
     {
         try
@@ -118,7 +115,7 @@ public class RidersController : ControllerBase
     /// Update rider availability (Online/Offline)
     /// </summary>
     [HttpPut("{riderId}/availability")]
-    [Authorize(Roles = "Rider")]
+]
     public async Task<ActionResult> UpdateRiderAvailability(int riderId, [FromBody] UpdateAvailabilityRequest request)
     {
         if (riderId <= 0)
@@ -134,21 +131,8 @@ public class RidersController : ControllerBase
 
         try
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-            {
-                _logger.LogWarning("Invalid user ID claim in token");
-                return Unauthorized(new { message = "Invalid authentication token" });
-            }
-
-            // Verify rider owns this account
-            var rider = await _riderService.GetRiderByUserIdAsync(userId);
-            if (rider == null || rider.RiderId != riderId)
-            {
-                _logger.LogWarning("Unauthorized attempt to update availability: UserId={UserId}, RiderId={RiderId}", 
-                    userId, riderId);
-                return Forbid();
-            }
+            // Note: Authentication removed - userId validation disabled
+            int userId = 0; // Default value
 
             var availability = await _riderService.UpdateRiderAvailabilityAsync(riderId, request);
             if (availability == null)
@@ -171,7 +155,7 @@ public class RidersController : ControllerBase
     /// Get rider delivery history
     /// </summary>
     [HttpGet("{riderId}/history")]
-    [Authorize(Roles = "Rider,Admin")]
+]
     public async Task<ActionResult> GetRiderHistory(int riderId, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
     {
         try
@@ -190,7 +174,7 @@ public class RidersController : ControllerBase
     /// Get rider feedback
     /// </summary>
     [HttpGet("{riderId}/feedback")]
-    [Authorize(Roles = "Rider,Admin")]
+]
     public async Task<ActionResult> GetRiderFeedback(int riderId)
     {
         try

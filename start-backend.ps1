@@ -8,7 +8,6 @@ $basePath = Get-Location
 $servicesPath = Join-Path $basePath "Services"
 
 $services = @(
-    @{ Name = "AuthService"; Path = "AuthService/AuthService.csproj"; Port = 5001 },
     @{ Name = "DeliveryService"; Path = "DeliveryService/DeliveryService.csproj"; Port = 5003 },
     @{ Name = "RiderService"; Path = "RiderService/RiderService.csproj"; Port = 5005 },
     @{ Name = "CustomerService"; Path = "CustomerService/CustomerService.csproj"; Port = 5007 },

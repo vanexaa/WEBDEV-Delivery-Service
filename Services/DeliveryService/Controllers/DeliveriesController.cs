@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using DeliveryService.Models.DTOs;
 using DeliveryService.Services;
 
@@ -11,7 +9,6 @@ namespace DeliveryService.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class DeliveriesController : ControllerBase
 {
     private readonly IDeliveryService _deliveryService;
@@ -27,7 +24,6 @@ public class DeliveriesController : ControllerBase
     /// Assign a delivery to a rider (Admin only, or auto-assign if RiderId is null)
     /// </summary>
     [HttpPost("assign")]
-    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> AssignDelivery([FromBody] AssignDeliveryRequest request)
     {
         if (request == null)
@@ -88,7 +84,6 @@ public class DeliveriesController : ControllerBase
     /// Get active deliveries (Rider and Admin)
     /// </summary>
     [HttpGet("active")]
-    [Authorize(Roles = "Rider,Admin")]
     public async Task<ActionResult> GetActiveDeliveries()
     {
         try
@@ -107,7 +102,6 @@ public class DeliveriesController : ControllerBase
     /// Reassign delivery to another rider (Admin only)
     /// </summary>
     [HttpPut("{orderId}/reassign")]
-    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> ReassignDelivery(int orderId, [FromBody] ReassignDeliveryRequest request)
     {
         try
@@ -132,7 +126,6 @@ public class DeliveriesController : ControllerBase
     /// Update delivery status (Rider)
     /// </summary>
     [HttpPut("{orderId}/status")]
-    [Authorize(Roles = "Rider,Admin")]
     public async Task<ActionResult> UpdateDeliveryStatus(int orderId, [FromBody] UpdateDeliveryStatusRequest request)
     {
         if (orderId <= 0)
@@ -153,12 +146,8 @@ public class DeliveriesController : ControllerBase
 
         try
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-            {
-                _logger.LogWarning("Invalid user ID claim in token");
-                return Unauthorized(new { message = "Invalid authentication token" });
-            }
+            // Note: userId removed - authentication disabled
+            int userId = 0; // Default value, update service to handle this
 
             var delivery = await _deliveryService.GetDeliveryByOrderIdAsync(orderId);
             if (delivery == null)
@@ -188,7 +177,6 @@ public class DeliveriesController : ControllerBase
     /// Mark delivery as failed (Rider and Admin)
     /// </summary>
     [HttpPut("{orderId}/failure")]
-    [Authorize(Roles = "Rider,Admin")]
     public async Task<ActionResult> MarkDeliveryAsFailed(int orderId, [FromBody] FailureRequest request)
     {
         if (orderId <= 0)
@@ -209,12 +197,8 @@ public class DeliveriesController : ControllerBase
 
         try
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-            {
-                _logger.LogWarning("Invalid user ID claim in token");
-                return Unauthorized(new { message = "Invalid authentication token" });
-            }
+            // Note: userId removed - authentication disabled
+            int userId = 0; // Default value, update service to handle this
 
             var delivery = await _deliveryService.GetDeliveryByOrderIdAsync(orderId);
             if (delivery == null)

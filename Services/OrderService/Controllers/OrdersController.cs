@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using OrderService.Models.DTOs;
 using OrderService.Services;
 
@@ -11,7 +9,6 @@ namespace OrderService.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class OrdersController : ControllerBase
 {
     private readonly IOrderService _orderService;
@@ -27,7 +24,7 @@ public class OrdersController : ControllerBase
     /// Create a new order
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Customer,Admin")]
+]
     public async Task<ActionResult> CreateOrder([FromBody] CreateOrderRequest request)
     {
         try
@@ -60,7 +57,7 @@ public class OrdersController : ControllerBase
     /// Get all orders
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+]
     public async Task<ActionResult> GetAllOrders()
     {
         try
@@ -79,23 +76,12 @@ public class OrdersController : ControllerBase
     /// Get orders by customer ID
     /// </summary>
     [HttpGet("customer/{customerId}")]
-    [Authorize(Roles = "Customer,Admin")]
+]
     public async Task<ActionResult> GetOrdersByCustomerId(int customerId)
     {
         try
         {
-            // Verify the customer is accessing their own orders (unless Admin)
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-            {
-                return Unauthorized(new { message = "Invalid authentication token" });
-            }
-
-            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-            if (userRole != "Admin" && userId != customerId)
-            {
-                return Forbid("You can only access your own orders");
-            }
+            // Note: Authentication removed - access control disabled
 
             var orders = await _orderService.GetOrdersByCustomerIdAsync(customerId);
             return Ok(orders);
