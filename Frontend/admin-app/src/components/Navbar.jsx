@@ -8,7 +8,10 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    // Clear all storage and redirect to login app
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = 'http://localhost:3000';
   };
 
   return (

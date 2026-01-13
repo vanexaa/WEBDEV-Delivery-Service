@@ -8,7 +8,7 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    window.location.href = 'http://localhost:3000';
   };
 
   return (
@@ -28,9 +28,9 @@ const Navbar = () => {
         <div className="collapse navbar-collapse" id="navbarNav">
           <ul className="navbar-nav ms-auto">
             <li className="nav-item">
-              <Link className="nav-link text-light" to="/">
+              <span className="nav-link text-light">
                 Track Order
-              </Link>
+              </span>
             </li>
             <li className="nav-item">
               <button className="nav-link btn btn-link text-light" onClick={handleLogout}>

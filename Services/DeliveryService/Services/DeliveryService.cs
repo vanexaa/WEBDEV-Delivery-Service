@@ -2,66 +2,118 @@ using DeliveryService.Data;
 using DeliveryService.Models;
 using DeliveryService.Models.DTOs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace DeliveryService.Services;
 
+/// <summary>
+/// Service for managing delivery operations including assignment, status updates, and tracking.
+/// </summary>
 public class DeliveryService : IDeliveryService
 {
     private readonly DeliveryDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly ILogger<DeliveryService> _logger;
 
-    public DeliveryService(DeliveryDbContext context, IConfiguration configuration, ILogger<DeliveryService> logger)
+    private static readonly string[] ActiveStatuses = { "Assigned", "Accepted", "PickedUp", "InTransit" };
+    private static readonly string[] ValidStatuses = { "Accepted", "PickedUp", "InTransit", "Delivered", "Failed" };
+
+    public DeliveryService(
+        DeliveryDbContext context, 
+        IConfiguration configuration, 
+        ILogger<DeliveryService> logger)
     {
-        _context = context;
-        _configuration = configuration;
-        _logger = logger;
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<Delivery?> AssignDeliveryAsync(AssignDeliveryRequest request)
     {
-        var order = await _context.Orders.FindAsync(request.OrderId);
-        if (order == null)
+        if (request == null)
         {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        if (request.OrderId <= 0)
+        {
+            _logger.LogWarning("Invalid order ID in assignment request: OrderId={OrderId}", request.OrderId);
             return null;
         }
 
-        // Check if delivery already exists
-        var existingDelivery = await _context.Deliveries
-            .FirstOrDefaultAsync(d => d.OrderId == request.OrderId);
-
-        if (existingDelivery != null)
+        try
         {
-            return existingDelivery;
+            var order = await _context.Orders.FindAsync(request.OrderId);
+            if (order == null)
+            {
+                _logger.LogWarning("Order not found for assignment: OrderId={OrderId}", request.OrderId);
+                return null;
+            }
+
+            // Check if delivery already exists
+            var existingDelivery = await _context.Deliveries
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => d.OrderId == request.OrderId);
+
+            if (existingDelivery != null)
+            {
+                _logger.LogInformation("Delivery already exists for OrderId={OrderId}, DeliveryId={DeliveryId}",
+                    request.OrderId, existingDelivery.DeliveryId);
+                return existingDelivery;
+            }
+
+            var restaurantLocation = _configuration.GetSection("RestaurantLocation");
+            var restaurantLatStr = restaurantLocation["Latitude"] ?? "0";
+            var restaurantLngStr = restaurantLocation["Longitude"] ?? "0";
+
+            if (!decimal.TryParse(restaurantLatStr, out decimal restaurantLat))
+            {
+                restaurantLat = 0;
+                _logger.LogWarning("Invalid restaurant latitude in configuration, using default: 0");
+            }
+
+            if (!decimal.TryParse(restaurantLngStr, out decimal restaurantLng))
+            {
+                restaurantLng = 0;
+                _logger.LogWarning("Invalid restaurant longitude in configuration, using default: 0");
+            }
+
+            var delivery = new Delivery
+            {
+                OrderId = request.OrderId,
+                RiderId = request.RiderId,
+                Status = "Assigned",
+                RestaurantLatitude = restaurantLat,
+                RestaurantLongitude = restaurantLng,
+                AssignedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.Deliveries.Add(delivery);
+            await _context.SaveChangesAsync();
+
+            // Add status history
+            _context.DeliveryStatusHistory.Add(new DeliveryStatusHistory
+            {
+                DeliveryId = delivery.DeliveryId,
+                Status = "Assigned",
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Delivery assigned successfully: DeliveryId={DeliveryId}, OrderId={OrderId}, RiderId={RiderId}",
+                delivery.DeliveryId, delivery.OrderId, delivery.RiderId);
+
+            return delivery;
         }
-
-        var restaurantLocation = _configuration.GetSection("RestaurantLocation");
-        var restaurantLat = decimal.Parse(restaurantLocation["Latitude"] ?? "0");
-        var restaurantLng = decimal.Parse(restaurantLocation["Longitude"] ?? "0");
-
-        var delivery = new Delivery
+        catch (Exception ex)
         {
-            OrderId = request.OrderId,
-            RiderId = request.RiderId, // If null, will be assigned by admin or auto-assignment logic
-            Status = "Assigned",
-            RestaurantLatitude = restaurantLat,
-            RestaurantLongitude = restaurantLng,
-            AssignedAt = DateTime.UtcNow
-        };
-
-        _context.Deliveries.Add(delivery);
-
-        // Add status history
-        _context.DeliveryStatusHistory.Add(new DeliveryStatusHistory
-        {
-            DeliveryId = delivery.DeliveryId,
-            Status = "Assigned",
-            CreatedAt = DateTime.UtcNow
-        });
-
-        await _context.SaveChangesAsync();
-
-        return delivery;
+            _logger.LogError(ex, "Error assigning delivery for OrderId={OrderId}", request.OrderId);
+            throw;
+        }
     }
 
     public async Task<Delivery?> GetDeliveryByOrderIdAsync(int orderId)
@@ -80,60 +132,105 @@ public class DeliveryService : IDeliveryService
 
     public async Task<List<Delivery>> GetActiveDeliveriesAsync()
     {
-        var activeStatuses = new[] { "Assigned", "Accepted", "PickedUp", "InTransit" };
-        return await _context.Deliveries
-            .Include(d => d.Order)
-            .Where(d => activeStatuses.Contains(d.Status))
-            .OrderByDescending(d => d.AssignedAt)
-            .ToListAsync();
+        try
+        {
+            return await _context.Deliveries
+                .Include(d => d.Order)
+                .Where(d => ActiveStatuses.Contains(d.Status))
+                .OrderByDescending(d => d.AssignedAt)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving active deliveries");
+            throw;
+        }
     }
 
     public async Task<Delivery?> UpdateDeliveryStatusAsync(int deliveryId, UpdateDeliveryStatusRequest request, int userId)
     {
-        var delivery = await _context.Deliveries.FindAsync(deliveryId);
-        if (delivery == null)
+        if (request == null)
         {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        if (deliveryId <= 0)
+        {
+            _logger.LogWarning("Invalid delivery ID: DeliveryId={DeliveryId}", deliveryId);
             return null;
         }
 
-        delivery.Status = request.Status;
-        delivery.UpdatedAt = DateTime.UtcNow;
-
-        // Update timestamps based on status
-        switch (request.Status)
+        if (string.IsNullOrWhiteSpace(request.Status))
         {
-            case "Accepted":
-                delivery.AcceptedAt = DateTime.UtcNow;
-                break;
-            case "PickedUp":
-                delivery.PickedUpAt = DateTime.UtcNow;
-                break;
-            case "InTransit":
-                if (request.Latitude.HasValue && request.Longitude.HasValue)
-                {
-                    delivery.DeliveryLatitude = request.Latitude.Value;
-                    delivery.DeliveryLongitude = request.Longitude.Value;
-                }
-                break;
-            case "Delivered":
-                delivery.DeliveredAt = DateTime.UtcNow;
-                delivery.ActualDeliveryTime = DateTime.UtcNow;
-                break;
+            _logger.LogWarning("Status is required for delivery update: DeliveryId={DeliveryId}", deliveryId);
+            return null;
         }
 
-        // Add status history
-        _context.DeliveryStatusHistory.Add(new DeliveryStatusHistory
+        if (!ValidStatuses.Contains(request.Status))
         {
-            DeliveryId = deliveryId,
-            Status = request.Status,
-            ChangedBy = userId,
-            Notes = request.Notes,
-            CreatedAt = DateTime.UtcNow
-        });
+            _logger.LogWarning("Invalid status provided: Status={Status}, DeliveryId={DeliveryId}", 
+                request.Status, deliveryId);
+            return null;
+        }
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            var delivery = await _context.Deliveries.FindAsync(deliveryId);
+            if (delivery == null)
+            {
+                _logger.LogWarning("Delivery not found: DeliveryId={DeliveryId}", deliveryId);
+                return null;
+            }
 
-        return delivery;
+            var previousStatus = delivery.Status;
+            delivery.Status = request.Status;
+            delivery.UpdatedAt = DateTime.UtcNow;
+
+            // Update timestamps based on status
+            switch (request.Status)
+            {
+                case "Accepted":
+                    delivery.AcceptedAt = DateTime.UtcNow;
+                    break;
+                case "PickedUp":
+                    delivery.PickedUpAt = DateTime.UtcNow;
+                    break;
+                case "InTransit":
+                    if (request.Latitude.HasValue && request.Longitude.HasValue)
+                    {
+                        delivery.DeliveryLatitude = request.Latitude.Value;
+                        delivery.DeliveryLongitude = request.Longitude.Value;
+                    }
+                    break;
+                case "Delivered":
+                    delivery.DeliveredAt = DateTime.UtcNow;
+                    delivery.ActualDeliveryTime = DateTime.UtcNow;
+                    break;
+            }
+
+            // Add status history
+            _context.DeliveryStatusHistory.Add(new DeliveryStatusHistory
+            {
+                DeliveryId = deliveryId,
+                Status = request.Status,
+                ChangedBy = userId,
+                Notes = request.Notes,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Delivery status updated: DeliveryId={DeliveryId}, PreviousStatus={PreviousStatus}, NewStatus={NewStatus}",
+                deliveryId, previousStatus, request.Status);
+
+            return delivery;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating delivery status: DeliveryId={DeliveryId}", deliveryId);
+            throw;
+        }
     }
 
     public async Task<Delivery?> MarkDeliveryAsFailedAsync(int deliveryId, string failureReason, int userId)

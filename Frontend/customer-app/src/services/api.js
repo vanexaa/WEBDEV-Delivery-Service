@@ -83,5 +83,9 @@ export const deliveryService = {
 export const orderService = {
   getOrderById: async (orderId) => {
     return fetchWithAuth(`${API_BASE_URL.order}/${orderId}`);
+  },
+  
+  getOrdersByCustomerId: async (customerId) => {
+    return fetchWithAuth(`${API_BASE_URL.order}/customer/${customerId}`);
   }
 };

@@ -9,14 +9,90 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('authToken');
-    const storedUser = localStorage.getItem('user');
+    // Check for token in URL params (from auth-app redirect) - optional authentication
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token');
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+    if (tokenFromUrl) {
+      console.log('Customer App: Token found in URL, attempting authentication (optional)...');
+      
+      // IMPORTANT: Clear any old tokens/data first to prevent conflicts
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('riderId');
+      localStorage.removeItem('authError');
+      sessionStorage.clear();
+      
+      // Store new token and fetch user data from API
+      setToken(tokenFromUrl);
+      localStorage.setItem('authToken', tokenFromUrl);
+      
+      // Fetch user data using the token (but don't fail if it doesn't work)
+      const fetchUserData = async () => {
+        try {
+          const response = await fetch('http://localhost:5001/api/auth/me', {
+            headers: {
+              'Authorization': `Bearer ${tokenFromUrl}`
+            }
+          });
+          
+          if (response.ok) {
+            const userData = await response.json();
+            console.log('Customer App: User data from API:', userData);
+            // Handle both PascalCase (C#) and camelCase (JS) property names
+            const userId = userData.userId ?? userData.UserId;
+            const username = userData.username ?? userData.Username ?? '';
+            const email = userData.email ?? userData.Email ?? '';
+            const role = userData.role ?? userData.Role ?? '';
+            
+            if (userId && role) {
+              const normalizedUserData = {
+                userId: userId,
+                username: username,
+                email: email,
+                role: role
+              };
+              
+              setUser(normalizedUserData);
+              localStorage.setItem('user', JSON.stringify(normalizedUserData));
+            }
+          } else {
+            // Response not OK - clear invalid token but continue
+            console.warn('Customer App: Authentication response not OK:', response.status);
+            localStorage.removeItem('authToken');
+            setToken(null);
+          }
+          // Clear URL params
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (error) {
+          console.warn('Customer App: Optional authentication failed, continuing without auth:', error);
+          // Clear invalid token but continue without authentication
+          localStorage.removeItem('authToken');
+          setToken(null);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      fetchUserData();
+    } else {
+      // Check for stored auth data (optional)
+      const storedToken = localStorage.getItem('authToken');
+      const storedUser = localStorage.getItem('user');
+
+      if (storedToken && storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setToken(storedToken);
+          setUser(userData);
+        } catch (error) {
+          console.error('Customer App: Error parsing stored user data:', error);
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+        }
+      }
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (username, password) => {
@@ -38,10 +114,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    console.log('Customer App: Logging out...');
     setUser(null);
     setToken(null);
+    setLoading(false);
+    // Clear all storage
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
+    localStorage.removeItem('authError');
+    sessionStorage.clear();
   };
 
   const value = {

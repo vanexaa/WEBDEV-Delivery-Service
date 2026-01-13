@@ -18,10 +18,20 @@ export const AuthProvider = ({ children }) => {
       });
       if (response.ok) {
         const rider = await response.json();
-        return rider.riderId;
+        // Handle both camelCase and PascalCase
+        return rider.riderId ?? rider.RiderId;
+      } else {
+        console.error('Failed to fetch rider ID:', response.status, await response.text().catch(() => ''));
       }
     } catch (error) {
       console.error('Error fetching rider ID:', error);
+      // Check if it's a network error
+      const isNetworkError = error.message?.includes('Failed to fetch') || 
+                             error.message?.includes('NetworkError') ||
+                             error.name === 'TypeError';
+      if (isNetworkError) {
+        console.error('Network error: Rider Service may not be running on http://localhost:5005');
+      }
     }
     return null;
   };
@@ -32,7 +42,16 @@ export const AuthProvider = ({ children }) => {
     const tokenFromUrl = urlParams.get('token');
 
     if (tokenFromUrl) {
-      // Store token and fetch user data from API
+      console.log('Rider App: Token found in URL, starting authentication...');
+      
+      // IMPORTANT: Clear any old tokens/data first to prevent conflicts
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('riderId');
+      localStorage.removeItem('authError');
+      sessionStorage.clear();
+      
+      // Store new token and fetch user data from API
       setToken(tokenFromUrl);
       localStorage.setItem('authToken', tokenFromUrl);
       
@@ -60,6 +79,12 @@ export const AuthProvider = ({ children }) => {
               throw new Error('Invalid user data received from API');
             }
             
+            // Verify role is Rider
+            if (role !== 'Rider') {
+              console.error('User is not a Rider:', role);
+              throw new Error(`Access denied. Expected Rider role, got ${role}`);
+            }
+            
             const normalizedUserData = {
               userId: userId,
               username: username,
@@ -70,12 +95,19 @@ export const AuthProvider = ({ children }) => {
             setUser(normalizedUserData);
             localStorage.setItem('user', JSON.stringify(normalizedUserData));
             
-            // Fetch rider ID if user is a rider
+            // Fetch rider ID if user is a rider (don't fail if this fails)
             if (role === 'Rider') {
-              const riderId = await fetchRiderId(userId, tokenFromUrl);
-              if (riderId) {
-                setRiderId(riderId);
-                localStorage.setItem('riderId', riderId.toString());
+              try {
+                const riderId = await fetchRiderId(userId, tokenFromUrl);
+                if (riderId) {
+                  setRiderId(riderId);
+                  localStorage.setItem('riderId', riderId.toString());
+                } else {
+                  console.warn('Could not fetch rider ID, but continuing with authentication');
+                }
+              } catch (riderError) {
+                console.error('Error fetching rider ID (non-fatal):', riderError);
+                // Don't fail authentication if rider ID fetch fails
               }
             }
             
@@ -83,8 +115,17 @@ export const AuthProvider = ({ children }) => {
             window.history.replaceState({}, document.title, window.location.pathname);
             setLoading(false);
           } else {
-            const errorText = await response.text();
+            const errorText = await response.text().catch(() => 'Unable to read error response');
             console.error('Failed to fetch user data:', response.status, errorText);
+            
+            // Store detailed error info
+            const errorInfo = {
+              type: response.status === 401 ? 'unauthorized' : 'server',
+              message: `Authentication failed: ${response.status} ${response.statusText}`,
+              details: errorText
+            };
+            localStorage.setItem('authError', JSON.stringify(errorInfo));
+            
             // Clear invalid token - don't redirect to avoid loop
             localStorage.removeItem('authToken');
             setToken(null);
@@ -94,6 +135,22 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
+          // Check if it's a network error
+          const isNetworkError = error.message?.includes('Failed to fetch') || 
+                                 error.message?.includes('NetworkError') ||
+                                 error.message?.includes('ERR_CONNECTION_REFUSED') ||
+                                 error.code === -102 ||
+                                 error.name === 'TypeError';
+          
+          if (isNetworkError) {
+            console.error('Network error detected. Please ensure Auth Service is running on http://localhost:5001');
+            // Store error info for display
+            localStorage.setItem('authError', JSON.stringify({
+              type: 'network',
+              message: 'Cannot connect to authentication service. Please ensure the Auth Service is running on port 5001.'
+            }));
+          }
+          
           // Log detailed error information
           if (error.message) {
             console.error('Error message:', error.message);
@@ -152,12 +209,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    console.log('Rider App: Logging out...');
     setUser(null);
     setRiderId(null);
     setToken(null);
+    setLoading(false);
+    // Clear all storage
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     localStorage.removeItem('riderId');
+    localStorage.removeItem('authError');
+    sessionStorage.clear();
   };
 
   const value = {

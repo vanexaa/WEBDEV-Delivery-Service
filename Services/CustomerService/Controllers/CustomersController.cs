@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using CustomerService.Models.DTOs;
 using CustomerService.Services;
-using System.Security.Claims;
 
 namespace CustomerService.Controllers;
 
+/// <summary>
+/// Controller for managing customer operations including rider information, ETA tracking, and feedback submission.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
@@ -16,8 +19,8 @@ public class CustomersController : ControllerBase
 
     public CustomersController(ICustomerService customerService, ILogger<CustomersController> logger)
     {
-        _customerService = customerService;
-        _logger = logger;
+        _customerService = customerService ?? throw new ArgumentNullException(nameof(customerService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -75,30 +78,48 @@ public class CustomersController : ControllerBase
     [Authorize(Roles = "Customer")]
     public async Task<ActionResult> SubmitFeedback(int orderId, [FromBody] FeedbackRequest request)
     {
+        if (orderId <= 0)
+        {
+            return BadRequest(new { message = "Invalid order ID" });
+        }
+
+        if (request == null)
+        {
+            _logger.LogWarning("Submit feedback called with null request for OrderId={OrderId}", orderId);
+            return BadRequest(new { message = "Request body is required" });
+        }
+
+        if (request.Rating < 1 || request.Rating > 5)
+        {
+            _logger.LogWarning("Invalid rating provided: Rating={Rating}, OrderId={OrderId}", 
+                request.Rating, orderId);
+            return BadRequest(new { message = "Rating must be between 1 and 5" });
+        }
+
         try
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int customerId))
             {
-                return Unauthorized();
-            }
-
-            if (request.Rating < 1 || request.Rating > 5)
-            {
-                return BadRequest(new { message = "Rating must be between 1 and 5" });
+                _logger.LogWarning("Invalid user ID claim in token");
+                return Unauthorized(new { message = "Invalid authentication token" });
             }
 
             var result = await _customerService.SubmitFeedbackAsync(orderId, customerId, request);
             if (!result)
             {
+                _logger.LogWarning("Failed to submit feedback: OrderId={OrderId}, CustomerId={CustomerId}",
+                    orderId, customerId);
                 return BadRequest(new { message = "Failed to submit feedback" });
             }
 
+            _logger.LogInformation("Feedback submitted successfully: OrderId={OrderId}, CustomerId={CustomerId}, Rating={Rating}",
+                orderId, customerId, request.Rating);
             return Ok(new { message = "Feedback submitted successfully" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error submitting feedback");
+            _logger.LogError(ex, "Error submitting feedback for OrderId={OrderId}", orderId);
             return StatusCode(500, new { message = "An error occurred" });
         }
     }

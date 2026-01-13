@@ -1,81 +1,144 @@
 using AuthService.Data;
 using AuthService.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AuthService.Services;
 
+/// <summary>
+/// Service for handling authentication operations including login and user retrieval.
+/// </summary>
 public class AuthService : IAuthService
 {
     private readonly AuthDbContext _context;
     private readonly ITokenService _tokenService;
+    private readonly ILogger<AuthService> _logger;
 
-    public AuthService(AuthDbContext context, ITokenService tokenService)
+    public AuthService(
+        AuthDbContext context, 
+        ITokenService tokenService,
+        ILogger<AuthService> logger)
     {
-        _context = context;
-        _tokenService = tokenService;
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+        _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// Authenticates a user and returns JWT token with user information.
+    /// </summary>
     public async Task<LoginResponse?> LoginAsync(LoginRequest request)
     {
-        // --- DEBUG LOGS ---
-        Console.WriteLine($"\n[DEBUG] Login Attempt for Username: '{request.Username}'");
-
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Username == request.Username);
-
-        if (user == null)
+        if (request == null)
         {
-            Console.WriteLine("[DEBUG] FAILED: Username not found in database.");
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+        {
             return null;
         }
 
-        if (!user.IsActive)
+        try
         {
-            Console.WriteLine("[DEBUG] FAILED: User found, but IsActive is FALSE.");
-            return null;
+            var user = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Username == request.Username && u.IsActive);
+
+            if (user == null)
+            {
+                return null;
+            }
+
+            // Verify password using BCrypt
+            var isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            if (!isPasswordValid)
+            {
+                return null;
+            }
+
+            // Generate JWT token
+            var token = _tokenService.GenerateToken(user);
+            var refreshToken = _tokenService.GenerateRefreshToken();
+
+            // Save refresh token
+            var refreshTokenEntity = new RefreshToken
+            {
+                UserId = user.UserId,
+                Token = refreshToken,
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.RefreshTokens.Add(refreshTokenEntity);
+            await _context.SaveChangesAsync();
+
+            var loginResponse = new LoginResponse
+            {
+                Token = token,
+                RefreshToken = refreshToken,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(60),
+                User = new UserInfo
+                {
+                    UserId = user.UserId,
+                    Username = user.Username,
+                    Email = user.Email,
+                    Role = user.Role
+                }
+            };
+
+            return loginResponse;
         }
-
-        // Temporary bypass to fix the "Sudden Bug"
-        bool isPasswordValid = (request.Password == "password123" || BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash));
-        
-        if (!isPasswordValid)
+        catch (Exception ex)
         {
-            Console.WriteLine("[DEBUG] FAILED: Password mismatch.");
-            return null;
+            _logger.LogError(ex, "Error during login for username: {Username}", request.Username);
+            throw;
         }
-
-        Console.WriteLine("[DEBUG] SUCCESS: Password verified.");
-
-        var token = _tokenService.GenerateToken(user);
-        var refreshToken = _tokenService.GenerateRefreshToken();
-
-        // Fixed RefreshToken mapping to be more basic
-        var refreshTokenEntity = new RefreshToken
-        {
-            UserId = user.UserId,
-            Token = refreshToken,
-            CreatedAt = DateTime.UtcNow
-            // Removed ExpiryDate to stop build error
-        };
-
-        _context.RefreshTokens.Add(refreshTokenEntity);
-        await _context.SaveChangesAsync();
-
-        // Fixed LoginResponse to only include what is definitely there
-        return new LoginResponse
-        {
-            Token = token,
-            RefreshToken = refreshToken
-        };
     }
 
-    public async Task<User?> GetUserByIdAsync(int id)
+    /// <summary>
+    /// Retrieves a user by their unique identifier.
+    /// </summary>
+    public async Task<User?> GetUserByIdAsync(int userId)
     {
-        return await _context.Users.FindAsync(id);
+        if (userId <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.UserId == userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving user by ID: {UserId}", userId);
+            throw;
+        }
     }
 
+    /// <summary>
+    /// Retrieves a user by their username.
+    /// </summary>
     public async Task<User?> GetUserByUsernameAsync(string username)
     {
-        return await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Username == username);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving user by username: {Username}", username);
+            throw;
+        }
     }
 }
