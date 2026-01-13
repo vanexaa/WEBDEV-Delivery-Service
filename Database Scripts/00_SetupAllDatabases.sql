@@ -17,17 +17,6 @@ PRINT '';
 PRINT 'STEP 1: Creating databases...';
 PRINT '';
 
-IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'AuthServiceDB')
-BEGIN
-    CREATE DATABASE AuthServiceDB;
-    PRINT '✓ AuthServiceDB created';
-END
-ELSE
-BEGIN
-    PRINT '⚠ AuthServiceDB already exists';
-END
-GO
-
 IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'DeliveryServiceDB')
 BEGIN
     CREATE DATABASE DeliveryServiceDB;
@@ -77,56 +66,7 @@ PRINT 'STEP 2: Creating tables...';
 PRINT '';
 
 -- =============================================
--- STEP 2: AuthServiceDB Tables
--- =============================================
-USE AuthServiceDB;
-GO
-
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND type in (N'U'))
-BEGIN
-    CREATE TABLE [dbo].[Users] (
-        [UserId] INT IDENTITY(1,1) PRIMARY KEY,
-        [Username] NVARCHAR(100) NOT NULL UNIQUE,
-        [Email] NVARCHAR(255) NOT NULL UNIQUE,
-        [PasswordHash] NVARCHAR(500) NOT NULL,
-        [Role] NVARCHAR(50) NOT NULL CHECK ([Role] IN ('Customer', 'Rider', 'Admin')),
-        [IsActive] BIT NOT NULL DEFAULT 1,
-        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
-        [UpdatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
-    );
-    CREATE INDEX IX_Users_Username ON [dbo].[Users]([Username]);
-    CREATE INDEX IX_Users_Email ON [dbo].[Users]([Email]);
-    CREATE INDEX IX_Users_Role ON [dbo].[Users]([Role]);
-    PRINT '✓ AuthServiceDB: Users table created';
-END
-ELSE
-BEGIN
-    PRINT '⚠ AuthServiceDB: Users table already exists';
-END
-GO
-
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[RefreshTokens]') AND type in (N'U'))
-BEGIN
-    CREATE TABLE [dbo].[RefreshTokens] (
-        [TokenId] INT IDENTITY(1,1) PRIMARY KEY,
-        [UserId] INT NOT NULL,
-        [Token] NVARCHAR(500) NOT NULL UNIQUE,
-        [ExpiresAt] DATETIME2 NOT NULL,
-        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
-        FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users]([UserId]) ON DELETE CASCADE
-    );
-    CREATE INDEX IX_RefreshTokens_UserId ON [dbo].[RefreshTokens]([UserId]);
-    CREATE INDEX IX_RefreshTokens_Token ON [dbo].[RefreshTokens]([Token]);
-    PRINT '✓ AuthServiceDB: RefreshTokens table created';
-END
-ELSE
-BEGIN
-    PRINT '⚠ AuthServiceDB: RefreshTokens table already exists';
-END
-GO
-
--- =============================================
--- STEP 3: DeliveryServiceDB Tables
+-- STEP 2: DeliveryServiceDB Tables
 -- =============================================
 USE DeliveryServiceDB;
 GO
@@ -179,7 +119,7 @@ END
 GO
 
 -- =============================================
--- STEP 4: RiderServiceDB Tables
+-- STEP 3: RiderServiceDB Tables
 -- =============================================
 USE RiderServiceDB;
 GO
@@ -281,7 +221,7 @@ END
 GO
 
 -- =============================================
--- STEP 5: CustomerServiceDB Tables
+-- STEP 4: CustomerServiceDB Tables
 -- =============================================
 USE CustomerServiceDB;
 GO
@@ -329,7 +269,7 @@ END
 GO
 
 -- =============================================
--- STEP 6: OrderServiceDB Tables
+-- STEP 5: OrderServiceDB Tables
 -- =============================================
 USE OrderServiceDB;
 GO
