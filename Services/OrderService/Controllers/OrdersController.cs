@@ -24,7 +24,8 @@ public class OrdersController : ControllerBase
     /// Create a new order
     /// </summary>
     [HttpPost]
-]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> CreateOrder([FromBody] CreateOrderRequest request)
     {
         try
@@ -57,7 +58,7 @@ public class OrdersController : ControllerBase
     /// Get all orders
     /// </summary>
     [HttpGet]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> GetAllOrders()
     {
         try
@@ -76,13 +77,12 @@ public class OrdersController : ControllerBase
     /// Get orders by customer ID
     /// </summary>
     [HttpGet("customer/{customerId}")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> GetOrdersByCustomerId(int customerId)
     {
         try
         {
             // Note: Authentication removed - access control disabled
-
             var orders = await _orderService.GetOrdersByCustomerIdAsync(customerId);
             return Ok(orders);
         }
@@ -97,6 +97,8 @@ public class OrdersController : ControllerBase
     /// Get order by ID
     /// </summary>
     [HttpGet("{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetOrder(int id)
     {
         try
@@ -106,7 +108,6 @@ public class OrdersController : ControllerBase
             {
                 return NotFound(new { message = "Order not found" });
             }
-
             return Ok(order);
         }
         catch (Exception ex)
