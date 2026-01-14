@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { deliveryService } from '../services/api';
+import { deliveryService, riderService } from '../services/api';
 import '../App.css';
 
 const DashboardPage = () => {
@@ -19,13 +19,29 @@ const DashboardPage = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const activeDeliveries = await deliveryService.getActiveDeliveries();
+      
+      // Load deliveries and riders in parallel
+      const [activeDeliveries, riders] = await Promise.all([
+        deliveryService.getActiveDeliveries().catch(() => []),
+        riderService.getAllRiders().catch(() => [])
+      ]);
+      
+      // Count online riders (active and online)
+      const onlineRidersCount = riders.filter(r => r.isActive && r.isOnline).length;
+      
+      // Count today's deliveries (deliveries created today)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayDeliveriesCount = activeDeliveries.filter(d => {
+        const assignedDate = new Date(d.assignedAt || d.createdAt);
+        return assignedDate >= today;
+      }).length;
       
       setStats({
         activeDeliveries: activeDeliveries.length,
         pendingAssignments: activeDeliveries.filter(d => d.status === 'Assigned').length,
-        onlineRiders: 0, // Would need additional API call
-        todayDeliveries: 0 // Would need additional API call
+        onlineRiders: onlineRidersCount,
+        todayDeliveries: todayDeliveriesCount
       });
       
       setDeliveries(activeDeliveries.slice(0, 10));
