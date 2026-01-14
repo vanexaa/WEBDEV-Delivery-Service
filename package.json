@@ -1,0 +1,17 @@
+{
+  "name": "delivery-service-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Microservices-based Delivery Management System",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:rider\" \"npm run dev:customer\" \"npm run dev:admin\"",
+    "dev:rider": "cd Frontend/rider-app && npm run dev",
+    "dev:customer": "cd Frontend/customer-app && npm run dev",
+    "dev:admin": "cd Frontend/admin-app && npm run dev",
+    "install:all": "npm install && cd Frontend/rider-app && npm install && cd ../customer-app && npm install && cd ../admin-app && npm install",
+    "build": "cd Frontend/rider-app && npm run build && cd ../customer-app && npm run build && cd ../admin-app && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

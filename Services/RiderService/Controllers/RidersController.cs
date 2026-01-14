@@ -21,10 +21,27 @@ public class RidersController : ControllerBase
     }
 
     /// <summary>
+    /// Get all riders (for admin dashboard)
+    /// </summary>
+    [HttpGet]
+    public async Task<ActionResult> GetAllRiders()
+    {
+        try
+        {
+            var riders = await _riderService.GetAllRidersAsync();
+            return Ok(riders);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all riders");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
     /// Get rider by ID
     /// </summary>
     [HttpGet("{riderId}")]
-]
     public async Task<ActionResult> GetRider(int riderId)
     {
         try
@@ -48,7 +65,6 @@ public class RidersController : ControllerBase
     /// Get rider profile with statistics
     /// </summary>
     [HttpGet("{riderId}/profile")]
-]
     public async Task<ActionResult> GetRiderProfile(int riderId)
     {
         try
@@ -72,7 +88,6 @@ public class RidersController : ControllerBase
     /// Get rider orders (would integrate with Delivery Service)
     /// </summary>
     [HttpGet("{riderId}/orders")]
-]
     public async Task<ActionResult> GetRiderOrders(int riderId)
     {
         try
@@ -91,7 +106,6 @@ public class RidersController : ControllerBase
     /// Get or update rider availability
     /// </summary>
     [HttpGet("{riderId}/availability")]
-]
     public async Task<ActionResult> GetRiderAvailability(int riderId)
     {
         try
@@ -115,7 +129,6 @@ public class RidersController : ControllerBase
     /// Update rider availability (Online/Offline)
     /// </summary>
     [HttpPut("{riderId}/availability")]
-]
     public async Task<ActionResult> UpdateRiderAvailability(int riderId, [FromBody] UpdateAvailabilityRequest request)
     {
         if (riderId <= 0)
@@ -131,9 +144,6 @@ public class RidersController : ControllerBase
 
         try
         {
-            // Note: Authentication removed - userId validation disabled
-            int userId = 0; // Default value
-
             var availability = await _riderService.UpdateRiderAvailabilityAsync(riderId, request);
             if (availability == null)
             {
@@ -155,7 +165,6 @@ public class RidersController : ControllerBase
     /// Get rider delivery history
     /// </summary>
     [HttpGet("{riderId}/history")]
-]
     public async Task<ActionResult> GetRiderHistory(int riderId, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
     {
         try
@@ -174,7 +183,6 @@ public class RidersController : ControllerBase
     /// Get rider feedback
     /// </summary>
     [HttpGet("{riderId}/feedback")]
-]
     public async Task<ActionResult> GetRiderFeedback(int riderId)
     {
         try
@@ -186,6 +194,24 @@ public class RidersController : ControllerBase
         {
             _logger.LogError(ex, "Error getting rider feedback");
             return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Seed mock data (for testing/development only)
+    /// </summary>
+    [HttpPost("seed")]
+    public async Task<ActionResult> SeedMockData()
+    {
+        try
+        {
+            await _riderService.SeedMockDataAsync();
+            return Ok(new { message = "Mock data seeded successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error seeding mock data");
+            return StatusCode(500, new { message = "An error occurred while seeding data" });
         }
     }
 }

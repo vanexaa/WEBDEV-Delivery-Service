@@ -74,6 +74,10 @@ export const deliveryService = {
 };
 
 export const riderService = {
+  getAllRiders: async () => {
+    return fetchWithAuth(`${API_BASE_URL.rider}`);
+  },
+  
   getRiderById: async (riderId) => {
     return fetchWithAuth(`${API_BASE_URL.rider}/${riderId}`);
   },

@@ -5,6 +5,7 @@ namespace RiderService.Services;
 
 public interface IRiderService
 {
+    Task<List<RiderListDto>> GetAllRidersAsync();
     Task<Rider?> GetRiderByIdAsync(int riderId);
     Task<Rider?> GetRiderByUserIdAsync(int userId);
     Task<RiderAvailability?> GetRiderAvailabilityAsync(int riderId);
@@ -13,4 +14,5 @@ public interface IRiderService
     Task<List<RiderEarning>> GetRiderEarningsAsync(int riderId, DateTime? startDate = null, DateTime? endDate = null);
     Task<List<RiderFeedback>> GetRiderFeedbackAsync(int riderId);
     Task<RiderProfileDto?> GetRiderProfileAsync(int riderId);
+    Task SeedMockDataAsync();
 }
