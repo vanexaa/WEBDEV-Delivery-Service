@@ -24,7 +24,8 @@ public class CustomersController : ControllerBase
     /// Get rider information for an order
     /// </summary>
     [HttpGet("{orderId}/rider")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetRiderInfo(int orderId)
     {
         try
@@ -34,7 +35,6 @@ public class CustomersController : ControllerBase
             {
                 return NotFound(new { message = "Rider information not found for this order" });
             }
-
             return Ok(riderInfo);
         }
         catch (Exception ex)
@@ -48,7 +48,8 @@ public class CustomersController : ControllerBase
     /// Get estimated time of arrival (ETA) for an order
     /// </summary>
     [HttpGet("{orderId}/eta")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetETA(int orderId)
     {
         try
@@ -58,7 +59,6 @@ public class CustomersController : ControllerBase
             {
                 return NotFound(new { message = "ETA not found for this order" });
             }
-
             return Ok(eta);
         }
         catch (Exception ex)
@@ -72,7 +72,8 @@ public class CustomersController : ControllerBase
     /// Submit feedback for a delivery
     /// </summary>
     [HttpPost("{orderId}/feedback")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> SubmitFeedback(int orderId, [FromBody] FeedbackRequest request)
     {
         if (orderId <= 0)
@@ -88,7 +89,7 @@ public class CustomersController : ControllerBase
 
         if (request.Rating < 1 || request.Rating > 5)
         {
-            _logger.LogWarning("Invalid rating provided: Rating={Rating}, OrderId={OrderId}", 
+            _logger.LogWarning("Invalid rating provided: Rating={Rating}, OrderId={OrderId}",
                 request.Rating, orderId);
             return BadRequest(new { message = "Rating must be between 1 and 5" });
         }
@@ -96,9 +97,9 @@ public class CustomersController : ControllerBase
         try
         {
             // Note: Authentication removed - customerId validation disabled
-            int customerId = 0; // Default value
-
+            int customerId = 0; // Default value [cite: 194]
             var result = await _customerService.SubmitFeedbackAsync(orderId, customerId, request);
+            
             if (!result)
             {
                 _logger.LogWarning("Failed to submit feedback: OrderId={OrderId}, CustomerId={CustomerId}",

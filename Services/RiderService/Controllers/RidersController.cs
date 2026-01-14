@@ -24,7 +24,8 @@ public class RidersController : ControllerBase
     /// Get rider by ID
     /// </summary>
     [HttpGet("{riderId}")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetRider(int riderId)
     {
         try
@@ -34,7 +35,6 @@ public class RidersController : ControllerBase
             {
                 return NotFound(new { message = "Rider not found" });
             }
-
             return Ok(rider);
         }
         catch (Exception ex)
@@ -48,7 +48,8 @@ public class RidersController : ControllerBase
     /// Get rider profile with statistics
     /// </summary>
     [HttpGet("{riderId}/profile")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetRiderProfile(int riderId)
     {
         try
@@ -58,7 +59,6 @@ public class RidersController : ControllerBase
             {
                 return NotFound(new { message = "Rider not found" });
             }
-
             return Ok(profile);
         }
         catch (Exception ex)
@@ -72,7 +72,7 @@ public class RidersController : ControllerBase
     /// Get rider orders (would integrate with Delivery Service)
     /// </summary>
     [HttpGet("{riderId}/orders")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> GetRiderOrders(int riderId)
     {
         try
@@ -91,7 +91,8 @@ public class RidersController : ControllerBase
     /// Get or update rider availability
     /// </summary>
     [HttpGet("{riderId}/availability")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetRiderAvailability(int riderId)
     {
         try
@@ -101,7 +102,6 @@ public class RidersController : ControllerBase
             {
                 return NotFound(new { message = "Availability not found" });
             }
-
             return Ok(availability);
         }
         catch (Exception ex)
@@ -115,31 +115,27 @@ public class RidersController : ControllerBase
     /// Update rider availability (Online/Offline)
     /// </summary>
     [HttpPut("{riderId}/availability")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> UpdateRiderAvailability(int riderId, [FromBody] UpdateAvailabilityRequest request)
     {
         if (riderId <= 0)
         {
             return BadRequest(new { message = "Invalid rider ID" });
         }
-
         if (request == null)
         {
             _logger.LogWarning("Update rider availability called with null request for RiderId={RiderId}", riderId);
             return BadRequest(new { message = "Request body is required" });
         }
-
         try
         {
             // Note: Authentication removed - userId validation disabled
-            int userId = 0; // Default value
-
             var availability = await _riderService.UpdateRiderAvailabilityAsync(riderId, request);
             if (availability == null)
             {
                 return StatusCode(500, new { message = "Failed to update availability" });
             }
-
             _logger.LogInformation("Rider availability updated: RiderId={RiderId}, IsOnline={IsOnline}",
                 riderId, request.IsOnline);
             return Ok(availability);
@@ -155,7 +151,7 @@ public class RidersController : ControllerBase
     /// Get rider delivery history
     /// </summary>
     [HttpGet("{riderId}/history")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> GetRiderHistory(int riderId, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
     {
         try
@@ -174,7 +170,7 @@ public class RidersController : ControllerBase
     /// Get rider feedback
     /// </summary>
     [HttpGet("{riderId}/feedback")]
-]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> GetRiderFeedback(int riderId)
     {
         try
