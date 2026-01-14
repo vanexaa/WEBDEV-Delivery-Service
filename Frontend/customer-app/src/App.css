@@ -1,0 +1,100 @@
+.page-container {
+  min-height: calc(100vh - 56px);
+  padding: 2rem 0;
+}
+
+.card {
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.order-card {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin-bottom: 1rem;
+}
+
+.order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.status-badge {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.75rem;
+}
+
+.timeline-item {
+  padding: 1rem;
+  border-left: 3px solid #dee2e6;
+  margin-bottom: 1rem;
+  position: relative;
+}
+
+.timeline-item.active {
+  border-left-color: #28a745;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 1.5rem;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #dee2e6;
+}
+
+.timeline-item.active::before {
+  background-color: #28a745;
+}
+
+.rating {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.rating input {
+  display: none;
+}
+
+.rating label {
+  font-size: 2rem;
+  color: #ddd;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.rating input:checked ~ label,
+.rating label:hover,
+.rating label:hover ~ label {
+  color: #ffc107;
+}
+
+.rating-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.rating-input .btn {
+  flex: 1;
+  max-width: 60px;
+}
+
+.order-item {
+  transition: background-color 0.2s;
+}
+
+.order-item:hover {
+  background-color: #f8f9fa !important;
+}
+
+@media (max-width: 768px) {
+  .page-container {
+    padding: 1rem 0;
+  }
+}
