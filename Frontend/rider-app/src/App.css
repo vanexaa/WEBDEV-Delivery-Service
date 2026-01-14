@@ -1,0 +1,36 @@
+.page-container {
+  padding: 20px;
+  min-height: calc(100vh - 56px);
+}
+
+.stat-card {
+  margin-bottom: 20px;
+}
+
+.stat-card h2 {
+  font-size: 2.5rem;
+  font-weight: bold;
+}
+
+.table-responsive {
+  margin-top: 20px;
+}
+
+.modal.show {
+  display: block;
+}
+
+.modal.show .modal-dialog {
+  margin-top: 50px;
+}
+
+.order-card {
+  margin-bottom: 15px;
+  transition: transform 0.2s;
+}
+
+.order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+

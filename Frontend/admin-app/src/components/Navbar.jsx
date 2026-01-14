@@ -1,19 +1,7 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../utils/AuthContext';
+import { Link } from 'react-router-dom';
 
 const Navbar = () => {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    // Clear all storage and redirect to login app
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.href = 'http://localhost:3000';
-  };
-
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
       <div className="container-fluid">
@@ -49,11 +37,6 @@ const Navbar = () => {
               <Link className="nav-link" to="/history">
                 History
               </Link>
-            </li>
-            <li className="nav-item">
-              <button className="nav-link btn btn-link text-light" onClick={handleLogout}>
-                Logout
-              </button>
             </li>
           </ul>
         </div>
