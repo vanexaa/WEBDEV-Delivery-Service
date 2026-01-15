@@ -64,7 +64,7 @@ public class RiderService : IRiderService
                     CurrentLatitude = request.Latitude,
                     CurrentLongitude = request.Longitude,
                     LastSeen = DateTime.UtcNow,
-                    CreatedAt = DateTime.UtcNow,
+                    // CreatedAt = DateTime.UtcNow, // Removed because property does not exist in Model
                     UpdatedAt = DateTime.UtcNow
                 };
                 _context.RiderAvailability.Add(availability);
@@ -82,10 +82,10 @@ public class RiderService : IRiderService
             }
 
             await _context.SaveChangesAsync();
-            
+
             _logger.LogInformation("Rider availability updated: RiderId={RiderId}, IsOnline={IsOnline}",
                 riderId, request.IsOnline);
-            
+
             return availability;
         }
         catch (Exception ex)
@@ -98,8 +98,8 @@ public class RiderService : IRiderService
     public async Task<List<RiderOrderDto>> GetRiderOrdersAsync(int riderId)
     {
         // This would typically call Delivery Service via HTTP client
-        // For now, returning empty list - in real implementation, would integrate with Delivery Service
-        return new List<RiderOrderDto>();
+        // Added Task.FromResult to resolve CS1998 warning
+        return await Task.FromResult(new List<RiderOrderDto>());
     }
 
     public async Task<List<RiderEarning>> GetRiderEarningsAsync(int riderId, DateTime? startDate = null, DateTime? endDate = null)
@@ -140,9 +140,11 @@ public class RiderService : IRiderService
         }
 
         var availability = await GetRiderAvailabilityAsync(riderId);
+        
         var earnings = await _context.RiderEarnings
             .Where(e => e.RiderId == riderId && e.Status == "Paid")
             .ToListAsync();
+
         var feedback = await _context.RiderFeedback
             .Where(f => f.RiderId == riderId)
             .ToListAsync();
