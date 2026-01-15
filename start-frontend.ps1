@@ -1,78 +1,35 @@
-# Start Frontend Applications Script
-# Run each app using npm run dev
+# Start Unified Frontend Application
+# Runs the unified frontend app on port 3000
 
-Write-Host "Starting Frontend Applications..." -ForegroundColor Green
+Write-Host "Starting Unified Frontend Application..." -ForegroundColor Green
+Write-Host ""
+Write-Host "Unified Frontend App runs on a single port (3000)" -ForegroundColor Cyan
+Write-Host "All roles (Admin, Rider, Customer) accessible through one app" -ForegroundColor Cyan
 Write-Host ""
 
 $basePath = Get-Location
-$frontendPath = Join-Path $basePath "Frontend"
+$unifiedAppPath = Join-Path $basePath "Frontend\unified-app"
 
-$apps = @(
-    @{ Name = "Auth App (Login)"; Path = "auth-app"; Port = 3000 },
-    @{ Name = "Rider App"; Path = "rider-app"; Port = 3001 },
-    @{ Name = "Customer App"; Path = "customer-app"; Port = 3002 },
-    @{ Name = "Admin App"; Path = "admin-app"; Port = 3003 }
-)
-
-Write-Host "Note: Each app will run in a new window using 'npm run dev'." -ForegroundColor Yellow
-Write-Host "Close the windows to stop the apps." -ForegroundColor Yellow
-Write-Host ""
-
-foreach ($app in $apps) {
-    $appPath = Join-Path $frontendPath $app.Path
-    Write-Host "Starting $($app.Name) on port $($app.Port)..." -ForegroundColor Cyan
-    
-    # Check if node_modules exists, if not install dependencies
-    $nodeModulesPath = Join-Path $appPath "node_modules"
-    if (-not (Test-Path $nodeModulesPath)) {
-        Write-Host "  Installing dependencies for $($app.Name)..." -ForegroundColor Yellow
-        Set-Location $appPath
-        npm install
-        Set-Location $basePath
-    }
-    
-    # Start the app in a new window
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$appPath'; Write-Host 'Starting $($app.Name) on port $($app.Port)...' -ForegroundColor Green; npm run dev"
-    Start-Sleep -Seconds 3
+# Check if node_modules exists
+$nodeModulesPath = Join-Path $unifiedAppPath "node_modules"
+if (-not (Test-Path $nodeModulesPath)) {
+    Write-Host "Installing dependencies..." -ForegroundColor Yellow
+    Set-Location $unifiedAppPath
+    npm install
+    Write-Host ""
 }
 
-Write-Host ""
-Write-Host "Waiting for apps to compile and start (this may take 30-60 seconds)..." -ForegroundColor Yellow
-Write-Host ""
-
-# Wait and test if apps are accessible
-$maxWait = 90
-$waitInterval = 5
-$elapsed = 0
-
-while ($elapsed -lt $maxWait) {
-    Start-Sleep -Seconds $waitInterval
-    $elapsed += $waitInterval
-    
-    $allRunning = $true
-    foreach ($app in $apps) {
-        try {
-            $response = Invoke-WebRequest -Uri "http://localhost:$($app.Port)" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
-            Write-Host "[OK] $($app.Name) is running on http://localhost:$($app.Port)" -ForegroundColor Green
-        } catch {
-            $allRunning = $false
-        }
-    }
-    
-    if ($allRunning) {
-        Write-Host ""
-        Write-Host "All apps are running!" -ForegroundColor Green
-        break
-    } else {
-        Write-Host "Still waiting... ($elapsed seconds)" -ForegroundColor Yellow
-    }
-}
+# Start unified app
+Write-Host "Starting unified frontend app on port 3000..." -ForegroundColor Yellow
+Set-Location $unifiedAppPath
+npm run dev
 
 Write-Host ""
-Write-Host "App URLs:" -ForegroundColor Cyan
-foreach ($app in $apps) {
-    Write-Host "  $($app.Name): http://localhost:$($app.Port)" -ForegroundColor White
-}
+Write-Host "Unified Frontend App is starting!" -ForegroundColor Green
+Write-Host "Access the app at: http://localhost:3000" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Check the PowerShell windows for any errors or compilation messages." -ForegroundColor Yellow
+Write-Host "After login, you'll be redirected based on your role:" -ForegroundColor White
+Write-Host "  - Admin → /admin/dashboard" -ForegroundColor White
+Write-Host "  - Rider → /rider/dashboard" -ForegroundColor White
+Write-Host "  - Customer → /customer/track" -ForegroundColor White
 Write-Host ""

@@ -1,47 +1,30 @@
-# How to Run the Application - Complete Guide
+# How to Run the Application - UnifiedService
 
 ## 🚀 Quick Start
 
-### Step 1: Start All Backend Services
+### Step 1: Start UnifiedService Backend
 
-**Easiest way - Use the start script:**
+**Single command to start everything:**
+
 ```powershell
-cd "c:\Users\Paula\Desktop\Delivery Service - Microservices"
+cd "Services\UnifiedService"
+dotnet run
+```
+
+**Or use the start script:**
+```powershell
 .\start-backend.ps1
 ```
 
-This will open 5 separate windows, one for each service. Wait until you see "Now listening on: http://localhost:XXXX" in each window.
+The UnifiedService will start on **http://localhost:5000**
 
-**Or manually start each service:**
-Open 5 separate PowerShell windows:
-
-```powershell
-# Window 1 - Auth Service
-cd "Services\AuthService"
-dotnet run
-
-# Window 2 - Delivery Service  
-cd "Services\DeliveryService"
-dotnet run
-
-# Window 3 - Rider Service
-cd "Services\RiderService"
-dotnet run
-
-# Window 4 - Customer Service
-cd "Services\CustomerService"
-dotnet run
-
-# Window 5 - Order Service
-cd "Services\OrderService"
-dotnet run
-```
+Wait until you see: `Now listening on: http://localhost:5000`
 
 ---
 
 ### Step 2: Start Frontend Applications
 
-Open 3 separate PowerShell windows:
+Open separate PowerShell windows:
 
 ```powershell
 # Window 1 - Rider App
@@ -57,15 +40,20 @@ cd "Frontend\admin-app"
 npm run dev
 ```
 
+**Or use the start script:**
+```powershell
+.\start-frontend.ps1
+```
+
 ---
 
 ## 🔐 Login Credentials
 
-**Yes, there is a login system!** Use these credentials:
+Use these credentials to login:
 
 | Role | Username | Password | App URL |
 |------|----------|----------|---------|
-| **Admin** | `admin` | `password123` | http://localhost:3001 (Admin App) |
+| **Admin** | `admin` | `password123` | http://localhost:3003 (Admin App) |
 | **Rider** | `rider1` | `password123` | http://localhost:3001 (Rider App) |
 | **Customer** | `customer1` | `password123` | http://localhost:3002 (Customer App) |
 
@@ -77,7 +65,7 @@ npm run dev
 
 ## 🌐 Access the Applications
 
-### Frontend Apps (With Login):
+### Frontend Apps:
 
 1. **Rider App** - http://localhost:3001
    - Login with: `rider1` / `password123`
@@ -91,40 +79,54 @@ npm run dev
    - View delivery status
    - Submit feedback
 
-3. **Admin App** - http://localhost:3001 (different port if rider-app is running)
+3. **Admin App** - http://localhost:3003
    - Login with: `admin` / `password123`
    - View all deliveries
    - Assign deliveries to riders
    - View statistics
 
-### Backend APIs (Swagger UI - No login needed for testing):
+4. **Login Page** - `Frontend/login-test.html`
+   - Open in browser or use HTTP server
+   - Redirects to appropriate app based on role
 
-- **Auth Service:** http://localhost:5001/swagger
-- **Delivery Service:** http://localhost:5003/swagger
-- **Rider Service:** http://localhost:5005/swagger
-- **Customer Service:** http://localhost:5007/swagger
-- **Order Service:** http://localhost:5009/swagger
+### Backend API (Swagger UI):
+
+- **UnifiedService:** http://localhost:5000/swagger
+  - All APIs accessible through single port
+  - Auth: `/api/auth/*`
+  - Delivery: `/api/deliveries/*`
+  - Rider: `/api/riders/*`
+  - Order: `/api/orders/*`
+  - Customer: `/api/customers/*`
 
 ---
 
 ## 📝 Step-by-Step: How to Login
 
-### Option 1: Using Frontend Apps
+### Option 1: Using Login Page (Recommended)
 
-1. **Start all services** (backend + frontend)
-2. **Open browser** and go to:
-   - Rider App: http://localhost:3001
-   - Customer App: http://localhost:3002
-   - Admin App: http://localhost:3001 (or different port)
+1. **Start UnifiedService:**
+   ```powershell
+   cd Services\UnifiedService
+   dotnet run
+   ```
+
+2. **Open login page:**
+   - Navigate to: `Frontend\login-test.html`
+   - Right-click → Open with browser
+   - Or use: `cd Frontend && python -m http.server 8080`
+   - Then open: `http://localhost:8080/login-test.html`
+
 3. **Enter credentials:**
    - Username: `admin` (or `rider1`, `customer1`)
    - Password: `password123`
+
 4. **Click "Login"**
-5. You'll be redirected to the dashboard!
+5. You'll be redirected to the appropriate app!
 
 ### Option 2: Using Swagger UI (API Testing)
 
-1. **Open Swagger:** http://localhost:5001/swagger
+1. **Open Swagger:** http://localhost:5000/swagger
 2. **Find** `POST /api/auth/login`
 3. **Click "Try it out"**
 4. **Enter:**
@@ -145,21 +147,18 @@ npm run dev
 
 ## ✅ Verify Everything is Running
 
-### Check Backend Services:
-Open these URLs - you should see Swagger UI:
-- ✅ http://localhost:5001/swagger
-- ✅ http://localhost:5003/swagger
-- ✅ http://localhost:5005/swagger
-- ✅ http://localhost:5007/swagger
-- ✅ http://localhost:5009/swagger
+### Check Backend Service:
+Open this URL - you should see Swagger UI:
+- ✅ http://localhost:5000/swagger
 
 ### Check Frontend Apps:
-Open these URLs - you should see login pages:
-- ✅ http://localhost:3001 (Rider/Admin App)
+Open these URLs - you should see login pages or dashboards:
+- ✅ http://localhost:3001 (Rider App)
 - ✅ http://localhost:3002 (Customer App)
+- ✅ http://localhost:3003 (Admin App)
 
 ### Quick Test:
-Run this command to test if services are working:
+Run this command to test if UnifiedService is working:
 ```powershell
 .\quick-test.ps1
 ```
@@ -170,10 +169,11 @@ Run this command to test if services are working:
 
 ### 1. Start Everything
 ```powershell
-# Start backend services
-.\start-backend.ps1
+# Start UnifiedService
+cd Services\UnifiedService
+dotnet run
 
-# Wait 30-60 seconds for services to start
+# Wait 5-10 seconds for service to start
 
 # Start frontend apps (in separate windows)
 cd Frontend\rider-app
@@ -187,23 +187,24 @@ npm run dev
 ```
 
 ### 2. Login as Admin
-- Go to: http://localhost:3001 (Admin App)
+- Go to: http://localhost:3003 (Admin App) or use login-test.html
 - Username: `admin`
 - Password: `password123`
 - You'll see the admin dashboard
 
 ### 3. Create an Order (via Swagger or Admin App)
-- Use Swagger: http://localhost:5009/swagger
+- Use Swagger: http://localhost:5000/swagger
+- Endpoint: `POST /api/orders`
 - Or use the Admin App interface
 
 ### 4. Login as Rider
-- Go to: http://localhost:3001 (Rider App)
+- Go to: http://localhost:3001 (Rider App) or use login-test.html
 - Username: `rider1`
 - Password: `password123`
 - View assigned orders
 
 ### 5. Login as Customer
-- Go to: http://localhost:3002 (Customer App)
+- Go to: http://localhost:3002 (Customer App) or use login-test.html
 - Username: `customer1`
 - Password: `password123`
 - Track your order
@@ -213,7 +214,7 @@ npm run dev
 ## 🆘 Troubleshooting
 
 ### "Cannot connect" or "Service not running"
-**Fix:** Make sure all backend services are started. Check the terminal windows.
+**Fix:** Make sure UnifiedService is started. Check the terminal window.
 
 ### "Login failed" or "Invalid credentials"
 **Fix:** 
@@ -223,8 +224,8 @@ npm run dev
 
 ### "Port already in use"
 **Fix:** 
-- Another service is using that port
-- Close the other service or change the port in `appsettings.json`
+- Another service is using port 5000
+- Close the other service or change the port in `Services/UnifiedService/Properties/launchSettings.json`
 
 ### Frontend app won't start
 **Fix:**
@@ -236,17 +237,14 @@ npm run dev
 
 ## 📋 Quick Reference
 
-**Backend Services:**
-- Auth: http://localhost:5001
-- Delivery: http://localhost:5003
-- Rider: http://localhost:5005
-- Customer: http://localhost:5007
-- Order: http://localhost:5009
+**Backend Service:**
+- UnifiedService: http://localhost:5000
+- Swagger UI: http://localhost:5000/swagger
 
 **Frontend Apps:**
 - Rider App: http://localhost:3001
 - Customer App: http://localhost:3002
-- Admin App: http://localhost:3001 (or different port)
+- Admin App: http://localhost:3003
 
 **Login:**
 - Username: `admin`, `rider1`, or `customer1`

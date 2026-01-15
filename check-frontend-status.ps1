@@ -4,7 +4,6 @@ Write-Host "`n=== Frontend Apps Status ===" -ForegroundColor Cyan
 Write-Host ""
 
 $apps = @(
-    @{ Name = "Auth App (Login)"; Port = 3000 },
     @{ Name = "Rider App"; Port = 3001 },
     @{ Name = "Customer App"; Port = 3002 },
     @{ Name = "Admin App"; Port = 3003 }
@@ -41,7 +40,7 @@ $nodeProcesses = Get-Process | Where-Object {$_.ProcessName -eq "node"} | Select
 Write-Host $nodeProcesses
 
 Write-Host "`n=== How to Access ===" -ForegroundColor Cyan
-Write-Host "1. Open your browser and go to: http://localhost:3000 (Login App)" -ForegroundColor White
+Write-Host "1. Open your browser and go to the app URLs listed above" -ForegroundColor White
 Write-Host "2. If apps are not responding, check the PowerShell windows that opened" -ForegroundColor White
 Write-Host "3. Look for windows with 'npm run dev' in the title" -ForegroundColor White
 Write-Host "4. If you see errors, the apps may need dependencies installed" -ForegroundColor White

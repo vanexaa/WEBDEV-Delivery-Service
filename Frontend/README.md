@@ -30,21 +30,21 @@ app-name/
 
 ### Installation & Running
 
-**Rider App (Port 3000):**
+**Rider App (Port 3001):**
 ```bash
 cd Frontend/rider-app
 npm install
 npm run dev
 ```
 
-**Admin App (Port 3001):**
+**Customer App (Port 3002):**
 ```bash
-cd Frontend/admin-app
+cd Frontend/customer-app
 npm install
 npm run dev
 ```
 
-**Customer App (Port 3002):**
+**Admin App (Port 3003):**
 ```bash
 cd Frontend/customer-app
 npm install
@@ -196,10 +196,12 @@ npm run preview
 ## 🌐 API Integration
 
 All API calls use the existing backend endpoints:
-- Auth Service: `http://localhost:5001/api/auth`
-- Delivery Service: `http://localhost:5003/api/deliveries`
-- Rider Service: `http://localhost:5005/api/riders`
-- Customer Service: `http://localhost:5007/api/customers`
+All services are accessible through UnifiedService on port 5000:
+- Auth: `http://localhost:5000/api/auth`
+- Delivery: `http://localhost:5000/api/deliveries`
+- Rider: `http://localhost:5000/api/riders`
+- Order: `http://localhost:5000/api/orders`
+- Customer: `http://localhost:5000/api/customers`
 
 See `API_DOCUMENTATION.md` in the root directory for endpoint details.
 

@@ -1,18 +1,38 @@
-# Microservices-Based Delivery Management System
+# Delivery Management System - UnifiedService Architecture
 
-A comprehensive delivery management system built with ASP.NET Web API microservices architecture for a single-restaurant setup. The system supports three user roles: **Customer**, **Rider**, and **Admin (Rider Admin)**.
+A comprehensive delivery management system built with ASP.NET Web API using a **UnifiedService** architecture for a single-restaurant setup. The system supports three user roles: **Customer**, **Rider**, and **Admin (Rider Admin)**.
 
 ## 🏗️ Architecture Overview
 
-This system follows a **microservices architecture** pattern where each service:
-- Has its own database schema
-- Can be deployed independently
-- Communicates via REST APIs (JSON)
-- Uses JWT-based authentication with role-based access control
+This system uses a **UnifiedService** approach where all services are consolidated into a single backend application running on **port 5000**. This provides:
 
-## 📦 Microservices
+### ✅ Benefits of Single Port (UnifiedService)
 
-### 1. **Auth Service** (Port: 5001/5002)
+**1. Simpler Deployment**
+- ✅ **One service to run instead of five** - Start a single application instead of managing multiple services
+- ✅ **One port to manage (5000)** - No need to track multiple ports (5001, 5003, 5005, 5007, 5009)
+- ✅ **Easier to start/stop** - Single command: `dotnet run` in UnifiedService folder
+
+**2. Reduced Complexity**
+- ✅ **No API Gateway needed** - Direct API calls from frontend to backend
+- ✅ **No inter-service communication overhead** - Services communicate through shared database or direct method calls
+- ✅ **Simpler networking configuration** - No need to configure service discovery, load balancing, or routing
+
+**3. Better for Development**
+- ✅ **Faster startup** - One application starts faster than five separate services
+- ✅ **Easier debugging** - Single process to debug, unified logging
+- ✅ **Less resource usage** - Lower memory and CPU footprint compared to multiple services
+
+**4. Still Organized**
+- ✅ **Controllers are separated by domain** - Auth, Delivery, Rider, Order, Customer controllers maintain separation of concerns
+- ✅ **Each has its own database** - Separate databases for each domain (AuthServiceDB, DeliveryServiceDB, etc.)
+- ✅ **Code structure remains modular** - Services, models, and data access are organized by domain
+
+## 📦 UnifiedService Components
+
+All services are accessible through **UnifiedService** on **port 5000**:
+
+### 1. **Auth Service** (`/api/auth/*`)
 - User authentication and authorization
 - JWT token generation and validation
 - Role-based access control (Customer, Rider, Admin)
@@ -20,7 +40,7 @@ This system follows a **microservices architecture** pattern where each service:
 
 **Database:** `AuthServiceDB`
 
-### 2. **Delivery Service** (Port: 5003/5004)
+### 2. **Delivery Service** (`/api/deliveries/*`)
 - Delivery assignment and tracking
 - Delivery status management
 - Order-to-delivery mapping
@@ -29,7 +49,7 @@ This system follows a **microservices architecture** pattern where each service:
 
 **Database:** `DeliveryServiceDB`
 
-### 3. **Rider Service** (Port: 5005/5006)
+### 3. **Rider Service** (`/api/riders/*`)
 - Rider profile management
 - Rider availability (Online/Offline)
 - Rider earnings tracking
@@ -38,13 +58,22 @@ This system follows a **microservices architecture** pattern where each service:
 
 **Database:** `RiderServiceDB`
 
-### 4. **Customer Service** (Port: 5007/5008)
+### 4. **Order Service** (`/api/orders/*`)
+- Order creation and management
+- Order status tracking
+- Customer order history
+
+**Database:** `OrderServiceDB`
+
+### 5. **Customer Service** (`/api/customers/*`)
 - Rider information viewing
 - ETA (Estimated Time of Arrival) tracking
 - Feedback submission
 - Order tracking integration
 
 **Database:** `CustomerServiceDB`
+
+> **Note:** See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture documentation.
 
 ## 🎨 Frontend Applications
 
@@ -96,26 +125,23 @@ Three separate frontend applications built with **Vite**, **Bootstrap 5**, and *
 
 ### Backend Setup
 
-1. **Navigate to each service directory:**
+1. **Navigate to UnifiedService directory:**
    ```bash
-   cd Services/AuthService
+   cd Services/UnifiedService
    dotnet restore
    dotnet run
    ```
-   Repeat for:
-   - `Services/DeliveryService`
-   - `Services/RiderService`
-   - `Services/CustomerService`
 
-2. **Each service will run on its designated port:**
-   - Auth Service: `http://localhost:5001` (HTTP) / `https://localhost:5002` (HTTPS)
-   - Delivery Service: `http://localhost:5003` (HTTP) / `https://localhost:5004` (HTTPS)
-   - Rider Service: `http://localhost:5005` (HTTP) / `https://localhost:5006` (HTTPS)
-   - Customer Service: `http://localhost:5007` (HTTP) / `https://localhost:5008` (HTTPS)
+2. **UnifiedService will run on port 5000:**
+   - Backend API: `http://localhost:5000`
+   - Swagger UI: `http://localhost:5000` (root URL)
 
-3. **Access Swagger documentation:**
-   - Each service provides Swagger UI at `/swagger`
-   - Example: `http://localhost:5001/swagger`
+3. **All API endpoints are accessible through port 5000:**
+   - Auth: `http://localhost:5000/api/auth/*`
+   - Deliveries: `http://localhost:5000/api/deliveries/*`
+   - Riders: `http://localhost:5000/api/riders/*`
+   - Orders: `http://localhost:5000/api/orders/*`
+   - Customers: `http://localhost:5000/api/customers/*`
 
 ### Frontend Setup
 
@@ -125,7 +151,7 @@ Three separate frontend applications built with **Vite**, **Bootstrap 5**, and *
    npm install
    npm run dev
    ```
-   Opens at `http://localhost:3000`
+   Opens at `http://localhost:3001` (connects to `http://localhost:5000/api/*`)
 
 2. **Admin App:**
    ```bash
@@ -133,7 +159,7 @@ Three separate frontend applications built with **Vite**, **Bootstrap 5**, and *
    npm install
    npm run dev
    ```
-   Opens at `http://localhost:3001`
+   Opens at `http://localhost:3003` (connects to `http://localhost:5000/api/*`)
 
 3. **Customer App:**
    ```bash
@@ -141,7 +167,12 @@ Three separate frontend applications built with **Vite**, **Bootstrap 5**, and *
    npm install
    npm run dev
    ```
-   Opens at `http://localhost:3002`
+   Opens at `http://localhost:3002` (connects to `http://localhost:5000/api/*`)
+
+4. **Login Page:**
+   - Open `Frontend/login-test.html` in your browser
+   - Or use: `cd Frontend && python -m http.server 8080`
+   - Then open: `http://localhost:8080/login-test.html`
 
 ## 🔐 Default Credentials
 
@@ -188,16 +219,20 @@ The database scripts create sample users:
 
 ## 🔌 API Endpoints
 
+All endpoints are accessible through **UnifiedService** at `http://localhost:5000`:
+
 See [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) for detailed API documentation.
 
 ### Quick Reference
 
-**Auth Service:**
+**Base URL:** `http://localhost:5000`
+
+**Auth Service** (`/api/auth/*`):
 - `POST /api/auth/login` - Login
 - `GET /api/auth/me` - Get current user
 - `GET /api/auth/validate` - Validate token
 
-**Delivery Service:**
+**Delivery Service** (`/api/deliveries/*`):
 - `POST /api/deliveries/assign` - Assign delivery (Admin)
 - `GET /api/deliveries/{orderId}` - Get delivery by order ID
 - `GET /api/deliveries/active` - Get active deliveries
@@ -205,16 +240,21 @@ See [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) for detailed API documentatio
 - `PUT /api/deliveries/{orderId}/reassign` - Reassign delivery (Admin)
 - `GET /api/deliveries/{orderId}/track` - Track delivery
 
-**Rider Service:**
+**Rider Service** (`/api/riders/*`):
+- `GET /api/riders` - Get all riders
 - `GET /api/riders/{riderId}` - Get rider details
 - `GET /api/riders/{riderId}/profile` - Get rider profile
 - `GET /api/riders/{riderId}/availability` - Get availability
 - `PUT /api/riders/{riderId}/availability` - Update availability
-- `GET /api/riders/{riderId}/orders` - Get rider orders
 - `GET /api/riders/{riderId}/history` - Get delivery history
 - `GET /api/riders/{riderId}/feedback` - Get feedback
 
-**Customer Service:**
+**Order Service** (`/api/orders/*`):
+- `POST /api/orders` - Create order
+- `GET /api/orders/{orderId}` - Get order by ID
+- `GET /api/orders/customer/{customerId}` - Get orders by customer
+
+**Customer Service** (`/api/customers/*`):
 - `GET /api/customers/{orderId}/rider` - Get rider info
 - `GET /api/customers/{orderId}/eta` - Get ETA
 - `POST /api/customers/{orderId}/feedback` - Submit feedback
@@ -243,21 +283,28 @@ Each microservice has its own database:
 - `Customers` - Customer profiles
 - `CustomerOrders` - Customer order references
 
+### OrderServiceDB
+- `Orders` - Order information and status
+
 ## 🔧 Configuration
 
 ### Connection Strings
-Update connection strings in each service's `appsettings.json`:
+Update connection strings in `Services/UnifiedService/appsettings.json`:
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=YourDatabase;Trusted_Connection=True;TrustServerCertificate=True;"
+    "AuthConnection": "Server=localhost;Database=AuthServiceDB;Trusted_Connection=True;TrustServerCertificate=True;",
+    "DeliveryConnection": "Server=localhost;Database=DeliveryServiceDB;Trusted_Connection=True;TrustServerCertificate=True;",
+    "RiderConnection": "Server=localhost;Database=RiderServiceDB;Trusted_Connection=True;TrustServerCertificate=True;",
+    "OrderConnection": "Server=localhost;Database=OrderServiceDB;Trusted_Connection=True;TrustServerCertificate=True;",
+    "CustomerConnection": "Server=localhost;Database=CustomerServiceDB;Trusted_Connection=True;TrustServerCertificate=True;"
   }
 }
 ```
 
 ### JWT Settings
-All services share JWT configuration. Update in `appsettings.json`:
+JWT configuration is in `Services/UnifiedService/appsettings.json`:
 
 ```json
 {
@@ -281,17 +328,20 @@ All services share JWT configuration. Update in `appsettings.json`:
 - **API Documentation:** Swagger/OpenAPI
 
 ### Important Design Decisions
-1. **No MVC Controllers or Razor Views** - Pure Web API architecture
-2. **Separate Frontend Apps** - Each role has its own frontend application
-3. **Database per Service** - Each microservice has its own database schema
-4. **REST API Communication** - Services communicate via HTTP REST APIs
-5. **JWT Authentication** - Centralized authentication with distributed authorization
+1. **UnifiedService Architecture** - All backend services consolidated into one application on port 5000
+2. **No MVC Controllers or Razor Views** - Pure Web API architecture
+3. **Separate Frontend Apps** - Each role has its own frontend application
+4. **Database per Domain** - Each domain has its own database schema (maintains separation)
+5. **Single Port Access** - All APIs accessible through one port (5000) - simpler deployment
+6. **JWT Authentication** - Centralized authentication with role-based authorization
+7. **Modular Code Organization** - Controllers, services, and data access organized by domain
 
 ### Service Communication
-- Services communicate via HTTP REST APIs
-- Customer Service calls Delivery Service and Rider Service
+- All services are unified in a single application (UnifiedService)
+- Services communicate through shared database or direct method calls
 - All services validate JWT tokens from Auth Service
-- In production, consider using API Gateway or Service Mesh
+- Frontend applications connect directly to UnifiedService on port 5000
+- No API Gateway needed - direct API access simplifies the architecture
 
 ## 🐛 Troubleshooting
 
@@ -312,14 +362,17 @@ All services share JWT configuration. Update in `appsettings.json`:
    - Verify token is sent in Authorization header: `Bearer <token>`
 
 4. **Port Conflicts:**
-   - Change ports in `Properties/launchSettings.json` for backend
-   - Change ports in `vite.config.js` for frontend
+   - Backend: Change port in `Services/UnifiedService/Properties/launchSettings.json`
+   - Frontend: Change ports in `vite.config.js` for each app
+   - Update API URLs in frontend `src/services/api.js` files if backend port changes
 
 ## 📚 Additional Documentation
 
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Detailed architecture documentation and design decisions
 - [API Documentation](./API_DOCUMENTATION.md) - Detailed API reference
+- [HOW_TO_RUN_LOGIN.md](./HOW_TO_RUN_LOGIN.md) - Instructions for running the login page
 - Database scripts are in `Database Scripts/` directory
-- Each service includes Swagger documentation
+- Swagger documentation available at `http://localhost:5000` when UnifiedService is running
 
 ## 🎓 Academic Use
 
