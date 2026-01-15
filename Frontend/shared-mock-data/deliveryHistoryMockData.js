@@ -7,6 +7,18 @@ const mockRiders = [
   { riderId: 3, fullName: 'Mike Johnson', phoneNumber: '09555123456', vehicleType: 'Motorcycle', vehicleNumber: 'DEF-9012', isOnline: true }
 ];
 
+export const mockRiderProfile = {
+  riderId: 1,
+  fullName: 'John Doe',
+  email: 'johndoe@email.com',
+  phoneNumber: '09123456789',
+  vehicleType: 'Motorcycle',
+  vehicleNumber: 'ABC-1234',
+  profileImage: 'https://picsum.photos/id/237/200/200',
+  status: 'Active'
+};
+
+
 // Mock delivery history data
 const mockDeliveryHistory = [
   {
