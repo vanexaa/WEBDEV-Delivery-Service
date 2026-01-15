@@ -48,10 +48,10 @@ const RiderNavbar = () => {
             </li>
             <li className="nav-item">
               <button
-                className={`nav-link btn btn-link text-light ${isActive('/earnings')}`}
-                onClick={() => navigate('/earnings')}
+                className={`nav-link btn btn-link text-light ${isActive('/history')}`}
+                onClick={() => navigate('/history')}
               >
-                <i className="bi bi-cash-coin"></i> Earnings
+                <i className="bi bi-clock-history"></i> History
               </button>
             </li>
             <li className="nav-item">

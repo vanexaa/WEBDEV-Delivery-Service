@@ -6,7 +6,7 @@ import RiderNavbar from '../components/RiderNavbar';
 import '../App.css';
 
 const OrderDetailsPage = () => {
-  const { orderId } = useParams();
+  const { transactionCode } = useParams();
   const navigate = useNavigate();
   const { riderId } = useAuth();
   const [order, setOrder] = useState(null);
@@ -17,19 +17,17 @@ const OrderDetailsPage = () => {
   const [statusNotes, setStatusNotes] = useState('');
   const [showFailureModal, setShowFailureModal] = useState(false);
   const [failureReason, setFailureReason] = useState('');
-  const [showCodModal, setShowCodModal] = useState(false);
-  const [codReceived, setCodReceived] = useState(false);
 
   useEffect(() => {
     loadOrderDetails();
-  }, [orderId]);
+  }, [transactionCode]);
 
   const loadOrderDetails = async () => {
     try {
       setLoading(true);
       const [orderData, deliveryData] = await Promise.all([
-        orderService.getOrderById(orderId),
-        deliveryService.getDeliveryByOrderId(orderId).catch(() => null)
+        orderService.getOrderById(transactionCode),
+        deliveryService.getDeliveryByOrderId(transactionCode).catch(() => null)
       ]);
       setOrder(orderData);
       setDelivery(deliveryData);
@@ -67,19 +65,15 @@ const OrderDetailsPage = () => {
       }
 
       await deliveryService.updateDeliveryStatus(
-        orderId,
+        transactionCode,
         newStatus,
         statusNotes || null,
         latitude,
         longitude
       );
 
-      if (newStatus === 'Delivered' && order?.paymentMethod === 'COD') {
-        setShowCodModal(true);
-      } else {
-        await loadOrderDetails();
-        setStatusNotes('');
-      }
+      await loadOrderDetails();
+      setStatusNotes('');
     } catch (err) {
       alert(err.message || 'Failed to update status');
       console.error('Error updating status:', err);
@@ -89,14 +83,8 @@ const OrderDetailsPage = () => {
   };
 
   const handleMarkDelivered = async () => {
-    if (order?.paymentMethod === 'COD' && !codReceived) {
-      alert('Please confirm COD payment received');
-      return;
-    }
-
     try {
-      await deliveryService.updateDeliveryStatus(orderId, 'Delivered', statusNotes);
-      setShowCodModal(false);
+      await deliveryService.updateDeliveryStatus(transactionId, 'Delivered', statusNotes);
       await loadOrderDetails();
       setStatusNotes('');
       navigate('/');
@@ -112,7 +100,7 @@ const OrderDetailsPage = () => {
     }
 
     try {
-      await deliveryService.markDeliveryAsFailed(orderId, failureReason);
+      await deliveryService.markDeliveryAsFailed(transactionId, failureReason);
       setShowFailureModal(false);
       setFailureReason('');
       navigate('/');
@@ -217,7 +205,7 @@ const OrderDetailsPage = () => {
             {/* Order Information */}
             <div className="card mb-4">
               <div className="card-header bg-primary text-white">
-                <h5 className="mb-0">Order #{order.orderId}</h5>
+                <h5 className="mb-0">{order.transactionCode}</h5>
               </div>
               <div className="card-body">
                 <div className="row mb-3">
@@ -412,56 +400,6 @@ const OrderDetailsPage = () => {
           </div>
         </div>
       </div>
-
-      {/* COD Modal */}
-      {showCodModal && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">COD Payment Confirmation</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowCodModal(false)}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <p>Order Total: <strong>${order.orderTotal.toFixed(2)}</strong></p>
-                <div className="form-check">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="codReceived"
-                    checked={codReceived}
-                    onChange={(e) => setCodReceived(e.target.checked)}
-                  />
-                  <label className="form-check-label" htmlFor="codReceived">
-                    I confirm that I have received the COD payment of ${order.orderTotal.toFixed(2)}
-                  </label>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowCodModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-success"
-                  onClick={handleMarkDelivered}
-                  disabled={!codReceived}
-                >
-                  Confirm Delivery
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Failure Modal */}
       {showFailureModal && (

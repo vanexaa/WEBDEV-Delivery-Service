@@ -15,7 +15,7 @@ const OrderCard = ({ order, onClick }) => {
     <div className="card order-card" onClick={onClick}>
       <div className="card-body">
         <div className="d-flex justify-content-between align-items-start mb-2">
-          <h6 className="card-title">Order #{order.orderId}</h6>
+          <h6 className="card-title">{order.transactionCode}</h6>
           <span className={`badge ${statusColors[order.status] || 'bg-secondary'} status-badge`}>
             {order.status}
           </span>

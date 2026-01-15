@@ -6,7 +6,7 @@ import '../App.css';
 
 const EarningsPage = () => {
   const { riderId } = useAuth();
-  const [earnings, setEarnings] = useState([]);
+  const [onlinePayments, setOnlinePayments] = useState({ totalOnlinePayments: 0, transactionCount: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dateFilter, setDateFilter] = useState('today'); // today, week, month, all
@@ -15,11 +15,11 @@ const EarningsPage = () => {
 
   useEffect(() => {
     if (riderId) {
-      loadEarnings();
+      loadOnlinePayments();
     }
   }, [riderId, dateFilter]);
 
-  const loadEarnings = async () => {
+  const loadOnlinePayments = async () => {
     try {
       setLoading(true);
       let start = null;
@@ -54,12 +54,12 @@ const EarningsPage = () => {
           break;
       }
 
-      const earningsData = await riderService.getEarnings(riderId, start, end);
-      setEarnings(earningsData || []);
+      const paymentsData = await riderService.getRiderOnlinePayments(riderId, start, end);
+      setOnlinePayments(paymentsData || { totalOnlinePayments: 0, transactionCount: 0 });
       setError('');
     } catch (err) {
-      setError(err.message || 'Failed to load earnings');
-      console.error('Error loading earnings:', err);
+      setError(err.message || 'Failed to load online payments');
+      console.error('Error loading online payments:', err);
     } finally {
       setLoading(false);
     }
@@ -67,13 +67,9 @@ const EarningsPage = () => {
 
   const handleCustomDateFilter = () => {
     if (startDate && endDate) {
-      loadEarnings();
+      loadOnlinePayments();
     }
   };
-
-  const totalEarnings = earnings.reduce((sum, earning) => sum + (earning.amount || 0), 0);
-  const totalDeliveries = earnings.length;
-  const averageEarning = totalDeliveries > 0 ? totalEarnings / totalDeliveries : 0;
 
   return (
     <>
@@ -81,33 +77,25 @@ const EarningsPage = () => {
       <div className="container-fluid page-container">
         <div className="row mb-4">
           <div className="col-12">
-            <h2 className="mb-4">Earnings</h2>
+            <h2 className="mb-4">Online Payments</h2>
           </div>
         </div>
 
         {/* Summary Cards */}
         <div className="row mb-4">
-          <div className="col-md-4 mb-3">
+          <div className="col-md-6 mb-3">
             <div className="card text-center">
               <div className="card-body">
-                <h6 className="text-muted">Total Earnings</h6>
-                <h3 className="text-success">${totalEarnings.toFixed(2)}</h3>
+                <h6 className="text-muted">Total Online Payments</h6>
+                <h3 className="text-success">${onlinePayments.totalOnlinePayments.toFixed(2)}</h3>
               </div>
             </div>
           </div>
-          <div className="col-md-4 mb-3">
+          <div className="col-md-6 mb-3">
             <div className="card text-center">
               <div className="card-body">
-                <h6 className="text-muted">Total Deliveries</h6>
-                <h3>{totalDeliveries}</h3>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-4 mb-3">
-            <div className="card text-center">
-              <div className="card-body">
-                <h6 className="text-muted">Average per Delivery</h6>
-                <h3>${averageEarning.toFixed(2)}</h3>
+                <h6 className="text-muted">Online Payment Transactions</h6>
+                <h3>{onlinePayments.transactionCount}</h3>
               </div>
             </div>
           </div>
@@ -168,10 +156,10 @@ const EarningsPage = () => {
           </div>
         </div>
 
-        {/* Earnings List */}
+        {/* Online Payments Summary */}
         <div className="card">
           <div className="card-header">
-            <h5 className="mb-0">Earnings History</h5>
+            <h5 className="mb-0">Online Payments Summary</h5>
           </div>
           <div className="card-body">
             {loading ? (
@@ -184,56 +172,15 @@ const EarningsPage = () => {
               <div className="alert alert-danger" role="alert">
                 {error}
               </div>
-            ) : earnings.length === 0 ? (
+            ) : onlinePayments.transactionCount === 0 ? (
               <div className="alert alert-info" role="alert">
-                No earnings found for the selected period.
+                No online payments found for the selected period.
               </div>
             ) : (
-              <div className="table-responsive">
-                <table className="table table-hover">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Order ID</th>
-                      <th>Amount</th>
-                      <th>Status</th>
-                      <th>Payment Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {earnings.map((earning) => (
-                      <tr key={earning.earningId}>
-                        <td>
-                          {earning.earningDate
-                            ? new Date(earning.earningDate).toLocaleDateString()
-                            : 'N/A'}
-                        </td>
-                        <td>#{earning.orderId || 'N/A'}</td>
-                        <td className="fw-bold text-success">
-                          ${(earning.amount || 0).toFixed(2)}
-                        </td>
-                        <td>
-                          <span
-                            className={`badge ${
-                              earning.status === 'Paid'
-                                ? 'bg-success'
-                                : earning.status === 'Pending'
-                                ? 'bg-warning'
-                                : 'bg-secondary'
-                            }`}
-                          >
-                            {earning.status || 'Pending'}
-                          </span>
-                        </td>
-                        <td>
-                          {earning.paymentDate
-                            ? new Date(earning.paymentDate).toLocaleDateString()
-                            : 'Pending'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="alert alert-success" role="alert">
+                <h5>Summary</h5>
+                <p className="mb-1"><strong>Total Online Payments:</strong> ${onlinePayments.totalOnlinePayments.toFixed(2)}</p>
+                <p className="mb-0"><strong>Number of Transactions:</strong> {onlinePayments.transactionCount}</p>
               </div>
             )}
           </div>

@@ -3,53 +3,55 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  // Default rider ID for testing (authentication removed)
-  const DEFAULT_RIDER_ID = 1;
-  
-  const [user, setUser] = useState({
-    userId: 1,
-    username: 'rider1',
-    email: 'rider1@restaurant.com',
-    role: 'Rider'
-  });
-  const [riderId, setRiderId] = useState(DEFAULT_RIDER_ID);
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [riderId, setRiderId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Try to fetch rider ID from API (optional, won't fail if it doesn't work)
-    const fetchRiderId = async () => {
-      try {
-        const response = await fetch(`http://localhost:5005/api/riders/${DEFAULT_RIDER_ID}`);
-        if (response.ok) {
-          const rider = await response.json();
-          const fetchedRiderId = rider.riderId ?? rider.RiderId;
-          if (fetchedRiderId) {
-            setRiderId(fetchedRiderId);
-          }
-        }
-      } catch (error) {
-        console.warn('Could not fetch rider ID, using default:', error);
-        // Continue with default rider ID
-      }
+    // Set dummy user data for testing (authentication disabled)
+    const dummyUser = {
+      userId: 1,
+      username: 'rider1',
+      email: 'rider1@example.com',
+      role: 'Rider'
     };
-    
-    fetchRiderId();
+    setUser(dummyUser);
+    setRiderId(1); // Default rider ID for testing
     setLoading(false);
   }, []);
 
+  const login = async (username, password) => {
+    // Dummy login - always succeeds
+    const dummyUser = {
+      userId: 1,
+      username: username,
+      email: `${username}@example.com`,
+      role: 'Rider'
+    };
+    setUser(dummyUser);
+    setRiderId(1);
+    return { success: true };
+  };
+
   const logout = () => {
-    console.log('Rider App: Logout (no-op since auth is disabled)');
-    // No-op since authentication is disabled
+    // Dummy logout - just reset to default
+    const dummyUser = {
+      userId: 1,
+      username: 'rider1',
+      email: 'rider1@example.com',
+      role: 'Rider'
+    };
+    setUser(dummyUser);
+    setRiderId(1);
   };
 
   const value = {
     user,
     riderId,
-    token: null, // No token needed
     loading,
-    isAuthenticated: true, // Always authenticated since auth is disabled
-    login: async () => ({ success: true }), // No-op
-    logout
+    isAuthenticated: true, // Always authenticated in dummy mode
+    login,
+    logout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -62,3 +64,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

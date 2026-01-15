@@ -1,14 +1,13 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './utils/AuthContext';
 import TrackOrderPage from './pages/TrackOrderPage';
 import Navbar from './components/Navbar';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
-  const { loading } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
   
-  // Wait for authentication check to complete (but don't require authentication)
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center vh-100 bg-light">
@@ -22,8 +21,10 @@ const ProtectedRoute = ({ children }) => {
     );
   }
   
-  // Allow access regardless of authentication status
-  // Authentication is optional for customer app
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
   return children;
 };
 

@@ -3,8 +3,8 @@ import { Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './utils/AuthContext';
 import DashboardPage from './pages/DashboardPage';
 import OrderDetailsPage from './pages/OrderDetailsPage';
-import EarningsPage from './pages/EarningsPage';
 import ProfilePage from './pages/ProfilePage';
+import DeliveryHistoryPage from './pages/DeliveryHistoryPage';
 import RiderNavbar from './components/RiderNavbar';
 import './App.css';
 
@@ -43,7 +43,7 @@ function App() {
           }
         />
         <Route
-          path="/orders/:orderId"
+          path="/orders/:transactionCode"
           element={
             <ProtectedRoute>
               <OrderDetailsPage />
@@ -51,10 +51,10 @@ function App() {
           }
         />
         <Route
-          path="/earnings"
+          path="/history"
           element={
             <ProtectedRoute>
-              <EarningsPage />
+              <DeliveryHistoryPage />
             </ProtectedRoute>
           }
         />

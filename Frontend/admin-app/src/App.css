@@ -1,25 +1,26 @@
 .page-container {
+  padding: 20px;
   min-height: calc(100vh - 56px);
-  padding: 2rem 0;
-}
-
-.card {
-  border: none;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .stat-card {
-  cursor: pointer;
-  transition: transform 0.2s;
+  margin-bottom: 20px;
 }
 
-.stat-card:hover {
-  transform: translateY(-2px);
+.stat-card h2 {
+  font-size: 2.5rem;
+  font-weight: bold;
 }
 
-@media (max-width: 768px) {
-  .page-container {
-    padding: 1rem 0;
-  }
+.table-responsive {
+  margin-top: 20px;
 }
+
+.modal.show {
+  display: block;
+}
+
+.modal.show .modal-dialog {
+  margin-top: 50px;
+}
+

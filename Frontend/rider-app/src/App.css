@@ -1,66 +1,36 @@
 .page-container {
+  padding: 20px;
   min-height: calc(100vh - 56px);
-  padding: 2rem 0;
 }
 
-.card {
-  border: none;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.stat-card {
+  margin-bottom: 20px;
+}
+
+.stat-card h2 {
+  font-size: 2.5rem;
+  font-weight: bold;
+}
+
+.table-responsive {
+  margin-top: 20px;
+}
+
+.modal.show {
+  display: block;
+}
+
+.modal.show .modal-dialog {
+  margin-top: 50px;
 }
 
 .order-card {
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  margin-bottom: 1rem;
+  margin-bottom: 15px;
+  transition: transform 0.2s;
 }
 
 .order-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
-.status-badge {
-  font-size: 0.85rem;
-  padding: 0.35rem 0.75rem;
-}
-
-.btn-action {
-  margin: 0.25rem;
-}
-
-.order-info-row {
-  margin-bottom: 0.75rem;
-}
-
-.order-info-label {
-  font-weight: 600;
-  color: #666;
-  margin-bottom: 0.25rem;
-  font-size: 0.9rem;
-}
-
-.order-info-value {
-  color: #333;
-}
-
-.form-check-input:checked {
-  background-color: #28a745;
-  border-color: #28a745;
-}
-
-.form-check-input {
-  width: 50px;
-  height: 25px;
-}
-
-/* Mobile responsive */
-@media (max-width: 768px) {
-  .page-container {
-    padding: 1rem 0;
-  }
-  
-  .card-body {
-    padding: 1rem;
-  }
-}

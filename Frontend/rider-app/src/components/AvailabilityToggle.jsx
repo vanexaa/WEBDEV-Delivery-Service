@@ -1,84 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../utils/AuthContext';
-import { riderService } from '../services/api';
 
 const AvailabilityToggle = () => {
-  const { riderId, token } = useAuth();
+  const { riderId } = useAuth();
   const [isOnline, setIsOnline] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (riderId) {
-      loadAvailability();
-    } else {
-      // If riderId is not available yet, stop loading
-      setLoading(false);
+    // Load initial availability status
+    // For now, default to offline. You can fetch from API if needed
+    const savedStatus = localStorage.getItem(`rider_${riderId}_online`);
+    if (savedStatus !== null) {
+      setIsOnline(savedStatus === 'true');
     }
   }, [riderId]);
 
-  const loadAvailability = async () => {
-    if (!riderId) return; // Prevent API call if riderId is null
+  const handleToggle = async () => {
     try {
-      const availability = await riderService.getAvailability(riderId);
-      setIsOnline(availability.isOnline || false);
+      setLoading(true);
+      const newStatus = !isOnline;
+      
+      // Update local state
+      setIsOnline(newStatus);
+      
+      // Save to localStorage
+      if (riderId) {
+        localStorage.setItem(`rider_${riderId}_online`, newStatus.toString());
+      }
+      
+      // TODO: Call API to update rider availability status
+      // await riderService.updateAvailability(riderId, newStatus);
+      
     } catch (error) {
-      console.error('Error loading availability:', error);
+      console.error('Error updating availability:', error);
+      // Revert on error
+      setIsOnline(!isOnline);
     } finally {
       setLoading(false);
     }
   };
-
-  const handleToggle = async (e) => {
-    const newStatus = e.target.checked;
-    setUpdating(true);
-    
-    try {
-      await riderService.updateAvailability(riderId, newStatus);
-      setIsOnline(newStatus);
-    } catch (error) {
-      console.error('Error updating availability:', error);
-      e.target.checked = !newStatus;
-      alert('Failed to update availability. Please try again.');
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="card">
-        <div className="card-body">
-          <div className="spinner-border spinner-border-sm" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="card">
       <div className="card-body">
         <div className="d-flex justify-content-between align-items-center">
           <div>
-            <h5 className="card-title mb-0">Availability Status</h5>
-            <small className="text-muted">
-              {isOnline ? 'Currently Online' : 'Currently Offline'}
-            </small>
+            <h6 className="mb-1">Availability Status</h6>
+            <p className="text-muted mb-0 small">
+              {isOnline 
+                ? 'You are currently online and can receive orders' 
+                : 'You are offline and will not receive new orders'}
+            </p>
           </div>
           <div className="form-check form-switch">
             <input
               className="form-check-input"
               type="checkbox"
-              id="availability-toggle"
+              role="switch"
+              id="availabilityToggle"
               checked={isOnline}
               onChange={handleToggle}
-              disabled={updating}
-              style={{ width: '50px', height: '25px' }}
+              disabled={loading || !riderId}
+              style={{ width: '3rem', height: '1.5rem' }}
             />
-            <label className="form-check-label ms-2" htmlFor="availability-toggle">
-              {isOnline ? 'Go Offline' : 'Go Online'}
+            <label className="form-check-label ms-2" htmlFor="availabilityToggle">
+              <span className={`badge ${isOnline ? 'bg-success' : 'bg-secondary'}`}>
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
             </label>
           </div>
         </div>
@@ -88,3 +76,4 @@ const AvailabilityToggle = () => {
 };
 
 export default AvailabilityToggle;
+

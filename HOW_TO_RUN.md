@@ -48,9 +48,6 @@ Open 3 separate PowerShell windows:
 cd "Frontend\rider-app"
 npm run dev
 
-# Window 2 - Customer App
-cd "Frontend\customer-app"
-npm run dev
 
 # Window 3 - Admin App
 cd "Frontend\admin-app"
