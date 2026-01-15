@@ -1,59 +1,78 @@
-# Quick Service Test
-Write-Host "`n=== Testing Services ===" -ForegroundColor Cyan
+# Quick Test Script - UnifiedService (Port 5000)
+# Tests all endpoints through the unified service
 
-# Test 1: Auth Service Login
-Write-Host "`n1. Testing Auth Service Login..." -ForegroundColor Yellow
-try {
-    $login = Invoke-RestMethod -Uri "http://localhost:5001/api/auth/login" -Method POST -ContentType "application/json" -Body '{"username":"admin","password":"password123"}'
-    Write-Host "   [OK] Login successful!" -ForegroundColor Green
-    $token = $login.token
-    Write-Host "   Token: $($token.Substring(0,30))..." -ForegroundColor Gray
-} catch {
-    Write-Host "   [FAIL] $($_.Exception.Message)" -ForegroundColor Red
-    exit
-}
-
-# Test 2: Order Service
-Write-Host "`n2. Testing Order Service..." -ForegroundColor Yellow
-try {
-    $orders = Invoke-RestMethod -Uri "http://localhost:5009/api/orders" -Method GET -Headers @{Authorization="Bearer $token"}
-    Write-Host "   [OK] Orders retrieved! Count: $($orders.Count)" -ForegroundColor Green
-} catch {
-    Write-Host "   [FAIL] $($_.Exception.Message)" -ForegroundColor Red
-}
-
-# Test 3: Delivery Service
-Write-Host "`n3. Testing Delivery Service..." -ForegroundColor Yellow
-try {
-    $deliveries = Invoke-RestMethod -Uri "http://localhost:5003/api/deliveries" -Method GET -Headers @{Authorization="Bearer $token"}
-    Write-Host "   [OK] Deliveries retrieved! Count: $($deliveries.Count)" -ForegroundColor Green
-} catch {
-    Write-Host "   [FAIL] $($_.Exception.Message)" -ForegroundColor Red
-}
-
-# Test 4: Customer Service
-Write-Host "`n4. Testing Customer Service..." -ForegroundColor Yellow
-try {
-    $test = Invoke-RestMethod -Uri "http://localhost:5007/api/customers/1/rider" -Method GET -Headers @{Authorization="Bearer $token"} -ErrorAction Stop
-    Write-Host "   [OK] Customer Service working!" -ForegroundColor Green
-} catch {
-    Write-Host "   [INFO] Service responds (order may not exist): $($_.Exception.Message)" -ForegroundColor Yellow
-}
-
-# Test 5: Rider Service
-Write-Host "`n5. Testing Rider Service..." -ForegroundColor Yellow
-try {
-    $rider = Invoke-RestMethod -Uri "http://localhost:5005/api/riders/2" -Method GET -Headers @{Authorization="Bearer $token"} -TimeoutSec 3
-    Write-Host "   [OK] Rider Service working!" -ForegroundColor Green
-} catch {
-    Write-Host "   [FAIL] Rider Service not running on port 5005" -ForegroundColor Red
-}
-
-Write-Host "`n=== Summary ===" -ForegroundColor Cyan
-Write-Host "Check the results above. Most services are working!" -ForegroundColor Green
-Write-Host "`nTo test manually, open Swagger UI:" -ForegroundColor Yellow
-Write-Host "  - Auth: http://localhost:5001/swagger" -ForegroundColor White
-Write-Host "  - Order: http://localhost:5009/swagger" -ForegroundColor White
-Write-Host "  - Delivery: http://localhost:5003/swagger" -ForegroundColor White
-Write-Host "  - Customer: http://localhost:5007/swagger" -ForegroundColor White
+Write-Host "Testing UnifiedService (Port 5000)..." -ForegroundColor Green
 Write-Host ""
+
+$baseUrl = "http://localhost:5000"
+
+try {
+    # Test 1: Login
+    Write-Host "1. Testing Login..." -ForegroundColor Cyan
+    $login = Invoke-RestMethod -Uri "$baseUrl/api/auth/login" -Method POST -ContentType "application/json" -Body '{"username":"admin","password":"password123"}'
+    $token = $login.token
+    Write-Host "   ✓ Login successful!" -ForegroundColor Green
+    Write-Host "   User: $($login.user.username), Role: $($login.user.role)" -ForegroundColor White
+    
+    $headers = @{Authorization = "Bearer $token"}
+    
+    # Test 2: Get Orders
+    Write-Host ""
+    Write-Host "2. Testing Orders API..." -ForegroundColor Cyan
+    try {
+        $orders = Invoke-RestMethod -Uri "$baseUrl/api/orders" -Method GET -Headers $headers -ErrorAction Stop
+        Write-Host "   ✓ Orders API working! Found $($orders.Count) orders" -ForegroundColor Green
+    } catch {
+        Write-Host "   ⚠ Orders API: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    
+    # Test 3: Get Deliveries
+    Write-Host ""
+    Write-Host "3. Testing Deliveries API..." -ForegroundColor Cyan
+    try {
+        $deliveries = Invoke-RestMethod -Uri "$baseUrl/api/deliveries/active" -Method GET -Headers $headers -ErrorAction Stop
+        Write-Host "   ✓ Deliveries API working! Found $($deliveries.Count) active deliveries" -ForegroundColor Green
+    } catch {
+        Write-Host "   ⚠ Deliveries API: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    
+    # Test 4: Get Riders
+    Write-Host ""
+    Write-Host "4. Testing Riders API..." -ForegroundColor Cyan
+    try {
+        $riders = Invoke-RestMethod -Uri "$baseUrl/api/riders" -Method GET -Headers $headers -ErrorAction Stop
+        Write-Host "   ✓ Riders API working! Found $($riders.Count) riders" -ForegroundColor Green
+    } catch {
+        Write-Host "   ⚠ Riders API: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    
+    # Test 5: Get Customers (if order exists)
+    Write-Host ""
+    Write-Host "5. Testing Customers API..." -ForegroundColor Cyan
+    try {
+        $test = Invoke-RestMethod -Uri "$baseUrl/api/customers/1/rider" -Method GET -Headers $headers -ErrorAction Stop
+        Write-Host "   ✓ Customers API working!" -ForegroundColor Green
+    } catch {
+        Write-Host "   ⚠ Customers API: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    
+    Write-Host ""
+    Write-Host "All tests completed!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "UnifiedService URLs:" -ForegroundColor Cyan
+    Write-Host "  - Swagger: http://localhost:5000/swagger" -ForegroundColor White
+    Write-Host "  - Auth: http://localhost:5000/api/auth/*" -ForegroundColor White
+    Write-Host "  - Delivery: http://localhost:5000/api/deliveries/*" -ForegroundColor White
+    Write-Host "  - Rider: http://localhost:5000/api/riders/*" -ForegroundColor White
+    Write-Host "  - Order: http://localhost:5000/api/orders/*" -ForegroundColor White
+    Write-Host "  - Customer: http://localhost:5000/api/customers/*" -ForegroundColor White
+    
+} catch {
+    Write-Host ""
+    Write-Host "✗ Error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Make sure:" -ForegroundColor Yellow
+    Write-Host "1. UnifiedService is running (cd Services\UnifiedService && dotnet run)" -ForegroundColor Yellow
+    Write-Host "2. Backend is accessible at http://localhost:5000" -ForegroundColor Yellow
+    Write-Host "3. Database is initialized" -ForegroundColor Yellow
+}

@@ -1,40 +1,10 @@
-# Database Setup Guide
+# Database Setup Guide - UnifiedService
 
-## Automatic Database Creation (Recommended)
+## Overview
 
-The services use **Entity Framework Core** to automatically create databases and tables when they start.
+UnifiedService uses **5 separate databases** (one for each domain) to maintain data separation while running as a single service.
 
-### How It Works
-
-When you run any service using `dotnet run`, EF Core will:
-- Automatically create the database if it doesn't exist
-- Create all tables based on the DbContext models
-- Set up all indexes and relationships
-
-**No manual SQL scripts needed!**
-
-### Starting Services
-
-Simply run the services and databases will be created automatically:
-
-```bash
-# Run all services
-cd Services
-dotnet run --project AuthService/AuthService.csproj
-dotnet run --project DeliveryService/DeliveryService.csproj
-dotnet run --project RiderService/RiderService.csproj
-dotnet run --project CustomerService/CustomerService.csproj
-dotnet run --project OrderService/OrderService.csproj
-```
-
-Or use the startup script:
-```powershell
-.\start-backend.ps1
-```
-
-## Databases Created
-
-The following databases will be automatically created:
+## Databases Required
 
 1. **AuthServiceDB** - User authentication and authorization
 2. **DeliveryServiceDB** - Delivery tracking and status
@@ -42,53 +12,126 @@ The following databases will be automatically created:
 4. **CustomerServiceDB** - Customer information and order history
 5. **OrderServiceDB** - Order management
 
-## Manual Setup (Optional - SQL Scripts)
+## Quick Setup
 
-If you prefer to set up databases manually using SQL scripts, you can use:
+### Option 1: Automatic Setup (Recommended)
 
-- `Database Scripts/00_SetupAllDatabases.sql` - Creates all databases and tables
+UnifiedService automatically creates all databases when it starts. Just run:
 
-**Note:** Manual setup is optional since EF Core handles everything automatically.
+```bash
+cd Services/UnifiedService
+dotnet run
+```
 
-## Requirements
+The service will:
+- Create all 5 databases if they don't exist
+- Create all tables automatically
+- Initialize the schema
 
-- SQL Server (LocalDB, Express, or Full Edition) - Must be installed and running
-- .NET 8.0 SDK
-- Entity Framework Core (already included in the projects)
+### Option 2: Manual Setup
 
-## Troubleshooting
+If you prefer to set up databases manually:
 
-### Database Creation Errors
+1. **Run the database setup script:**
+   ```sql
+   -- Execute this script in SQL Server Management Studio
+   -- File: Database Scripts/00_SetupAllDatabases.sql
+   ```
 
-If you get database creation errors:
+2. **Create test accounts:**
+   ```sql
+   -- Execute this script
+   -- File: Database Scripts/05_CreateTestAccounts.sql
+   ```
 
-1. **SQL Server not running:**
-   - Make sure SQL Server is installed and running
-   - Check if SQL Server Browser service is running
-   - Verify connection string in `appsettings.json`
+3. **Create test order (optional):**
+   ```sql
+   -- Execute this script
+   -- File: Database Scripts/06_CreateTestOrder.sql
+   ```
 
-2. **Connection string issues:**
-   - Default uses: `Server=localhost;Database=...;Trusted_Connection=True;TrustServerCertificate=True;`
-   - For SQL Server Express, use: `Server=localhost\SQLEXPRESS;Database=...;Trusted_Connection=True;TrustServerCertificate=True;`
-   - Update connection strings in each service's `appsettings.json` if needed
+## Connection Strings
 
-3. **Permissions:**
-   - Ensure your SQL Server login has permissions to create databases
-   - Windows Authentication should work by default
+All connection strings are configured in `Services/UnifiedService/appsettings.json`:
 
-### Viewing Databases
+```json
+{
+  "ConnectionStrings": {
+    "AuthConnection": "Server=localhost;Database=AuthServiceDB;Trusted_Connection=True;TrustServerCertificate=True;",
+    "DeliveryConnection": "Server=localhost;Database=DeliveryServiceDB;Trusted_Connection=True;TrustServerCertificate=True;",
+    "RiderConnection": "Server=localhost;Database=RiderServiceDB;Trusted_Connection=True;TrustServerCertificate=True;",
+    "OrderConnection": "Server=localhost;Database=OrderServiceDB;Trusted_Connection=True;TrustServerCertificate=True;",
+    "CustomerConnection": "Server=localhost;Database=CustomerServiceDB;Trusted_Connection=True;TrustServerCertificate=True;"
+  }
+}
+```
 
-After services start, you can verify databases were created:
-- Open SQL Server Management Studio (SSMS)
-- Connect to your SQL Server instance
-- Check Object Explorer for the created databases
+## Database Structure
+
+### AuthServiceDB
+- `Users` - User accounts with roles (Admin, Rider, Customer)
+- `RefreshTokens` - Refresh token management
+
+### DeliveryServiceDB
+- `Orders` - Order information
+- `Deliveries` - Delivery records and status
+- `DeliveryStatusHistory` - Status change history
+- `DeliveryProof` - Delivery proof (photos, OTP, signatures)
+
+### RiderServiceDB
+- `Riders` - Rider profiles and information
+- `RiderAvailability` - Online/offline status
+- `RiderEarnings` - Earnings records
+- `RiderFeedback` - Customer feedback for riders
+
+### CustomerServiceDB
+- `Customers` - Customer profiles
+- `CustomerOrders` - Customer order references
+
+### OrderServiceDB
+- `Orders` - Order information and status
 
 ## Test Accounts
 
-After the first run, you can create test accounts using:
-- `Database Scripts/01_CreateTestAccounts.sql` (optional)
+After running the setup scripts, you can use these test accounts:
 
-Test account credentials (if created):
-- **Admin:** username: `admin`, password: `password123`
-- **Rider:** username: `rider1`, password: `password123`
-- **Customer:** username: `customer1`, password: `password123`
+| Role | Username | Password |
+|------|----------|----------|
+| Admin | `admin` | `password123` |
+| Rider | `rider1` | `password123` |
+| Customer | `customer1` | `password123` |
+
+## Verification
+
+After UnifiedService starts, check the console output. You should see:
+```
+Initializing Auth database...
+Auth database verified
+Initializing Delivery database...
+Delivery database verified
+...
+```
+
+If you see errors, check:
+1. SQL Server is running
+2. Connection strings are correct
+3. You have permissions to create databases
+
+## Troubleshooting
+
+### "Cannot connect to database"
+- Verify SQL Server is running
+- Check connection strings in `appsettings.json`
+- Ensure SQL Server allows Windows Authentication (or update connection string)
+
+### "Database already exists"
+- This is normal if databases were created previously
+- UnifiedService will use existing databases
+
+### "Table already exists"
+- This is normal if tables were created previously
+- UnifiedService will use existing tables
+
+---
+
+**Note:** UnifiedService automatically handles database creation and initialization. You typically don't need to run scripts manually unless you want to reset the databases.

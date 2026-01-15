@@ -1,36 +1,32 @@
-# Start Backend Services Script
-# Run each service using dotnet run
+# Start UnifiedService - Single Backend Service
+# All services are now consolidated in UnifiedService running on port 5000
 
-Write-Host "Starting Backend Services..." -ForegroundColor Green
+Write-Host "Starting UnifiedService..." -ForegroundColor Green
+Write-Host ""
+Write-Host "UnifiedService consolidates all microservices (Auth, Delivery, Rider, Order, Customer)" -ForegroundColor Cyan
+Write-Host "into a single backend application running on port 5000." -ForegroundColor Cyan
 Write-Host ""
 
 $basePath = Get-Location
-$servicesPath = Join-Path $basePath "Services"
+$unifiedServicePath = Join-Path $basePath "Services\UnifiedService"
 
-$services = @(
-    @{ Name = "AuthService"; Path = "AuthService/AuthService.csproj"; Port = 5001 },
-    @{ Name = "DeliveryService"; Path = "DeliveryService/DeliveryService.csproj"; Port = 5003 },
-    @{ Name = "RiderService"; Path = "RiderService/RiderService.csproj"; Port = 5005 },
-    @{ Name = "CustomerService"; Path = "CustomerService/CustomerService.csproj"; Port = 5007 },
-    @{ Name = "OrderService"; Path = "OrderService/OrderService.csproj"; Port = 5009 }
-)
-
-Write-Host "Note: Each service will run in a new window using 'dotnet run'." -ForegroundColor Yellow
-Write-Host "Close the windows to stop the services." -ForegroundColor Yellow
+Write-Host "Starting UnifiedService on port 5000..." -ForegroundColor Yellow
 Write-Host ""
 
-foreach ($service in $services) {
-    Write-Host "Starting $($service.Name) on port $($service.Port)..." -ForegroundColor Cyan
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$servicesPath'; dotnet run --project $($service.Path)"
-    Start-Sleep -Seconds 1
-}
+# Start UnifiedService
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$unifiedServicePath'; dotnet run"
 
 Write-Host ""
-Write-Host "All backend services are starting!" -ForegroundColor Green
-Write-Host "Check the new PowerShell windows for service status." -ForegroundColor Yellow
+Write-Host "UnifiedService is starting!" -ForegroundColor Green
+Write-Host "Check the PowerShell window for service status." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "Service URLs:" -ForegroundColor Cyan
-foreach ($service in $services) {
-    Write-Host "  $($service.Name): http://localhost:$($service.Port)/swagger" -ForegroundColor White
-}
+Write-Host "Service URL:" -ForegroundColor Cyan
+Write-Host "  UnifiedService: http://localhost:5000/swagger" -ForegroundColor White
+Write-Host ""
+Write-Host "All API endpoints:" -ForegroundColor Cyan
+Write-Host "  - Auth: http://localhost:5000/api/auth/*" -ForegroundColor White
+Write-Host "  - Delivery: http://localhost:5000/api/deliveries/*" -ForegroundColor White
+Write-Host "  - Rider: http://localhost:5000/api/riders/*" -ForegroundColor White
+Write-Host "  - Order: http://localhost:5000/api/orders/*" -ForegroundColor White
+Write-Host "  - Customer: http://localhost:5000/api/customers/*" -ForegroundColor White
 Write-Host ""

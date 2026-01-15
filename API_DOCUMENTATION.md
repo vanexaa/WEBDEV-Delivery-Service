@@ -4,10 +4,13 @@ Complete API reference for the Delivery Management System microservices.
 
 ## Base URLs
 
-- **Auth Service:** `http://localhost:5001/api`
-- **Delivery Service:** `http://localhost:5003/api`
-- **Rider Service:** `http://localhost:5005/api`
-- **Customer Service:** `http://localhost:5007/api`
+All services are accessible through **UnifiedService** on port 5000:
+- **Base URL:** `http://localhost:5000/api`
+- **Auth:** `http://localhost:5000/api/auth`
+- **Delivery:** `http://localhost:5000/api/deliveries`
+- **Rider:** `http://localhost:5000/api/riders`
+- **Order:** `http://localhost:5000/api/orders`
+- **Customer:** `http://localhost:5000/api/customers`
 
 ## Authentication
 
@@ -19,9 +22,9 @@ Authorization: Bearer <your_jwt_token>
 
 ---
 
-## Auth Service
+## Auth Service (`/api/auth/*`)
 
-### POST /auth/login
+### POST /api/auth/login
 Authenticate user and receive JWT token.
 
 **Request:**
@@ -88,7 +91,7 @@ Validate JWT token.
 
 ---
 
-## Delivery Service
+## Delivery Service (`/api/deliveries/*`)
 
 ### POST /deliveries/assign
 Assign a delivery to a rider (Admin only).
@@ -274,7 +277,7 @@ Get delivery tracking information.
 
 ---
 
-## Rider Service
+## Rider Service (`/api/riders/*`)
 
 ### GET /riders/{riderId}
 Get rider information.
@@ -434,7 +437,7 @@ Get rider feedback.
 
 ---
 
-## Customer Service
+## Customer Service (`/api/customers/*`)
 
 ### GET /customers/{orderId}/rider
 Get rider information for an order.
