@@ -8,10 +8,8 @@ import '../App.css';
 
 const DashboardPage = () => {
   const [orders, setOrders] = useState([]);
-  const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const { riderId, user } = useAuth();
   const navigate = useNavigate();
 
@@ -21,29 +19,6 @@ const DashboardPage = () => {
     const interval = setInterval(loadActiveOrders, 30000);
     return () => clearInterval(interval);
   }, [riderId, user]);
-
-  useEffect(() => {
-    // Apply search filter whenever orders or searchQuery changes
-    if (searchQuery.trim() === '') {
-      setFilteredOrders(orders);
-    } else {
-      const query = searchQuery.toLowerCase().trim();
-      const filtered = orders.filter((order) => {
-        const transactionCode = order.transactionCode?.toLowerCase() || '';
-        const customerName = order.order?.customerName?.toLowerCase() || '';
-        const address = order.order?.deliveryAddress?.toLowerCase() || '';
-        const status = order.status?.toLowerCase() || '';
-        
-        return (
-          transactionCode.includes(query) ||
-          customerName.includes(query) ||
-          address.includes(query) ||
-          status.includes(query)
-        );
-      });
-      setFilteredOrders(filtered);
-    }
-  }, [orders, searchQuery]);
 
   const loadActiveOrders = async () => {
     try {
@@ -67,8 +42,8 @@ const DashboardPage = () => {
     }
   };
 
-  const handleOrderClick = (transactionCode) => {
-    navigate(`/orders/${transactionCode}`);
+  const handleOrderClick = (orderId) => {
+    navigate(`/orders/${orderId}`);
   };
 
   return (
@@ -94,26 +69,6 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Search Bar */}
-        {!loading && !error && orders.length > 0 && (
-          <div className="row mb-3">
-            <div className="col-12">
-              <div className="card">
-                <div className="card-body">
-                  <label className="form-label">Search</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search by transaction code, customer name, address, or status..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className="row">
           <div className="col-12">
             {loading && (
@@ -134,23 +89,18 @@ const DashboardPage = () => {
                 Make sure you're online to receive new orders.
               </div>
             )}
-            {!loading && !error && orders.length > 0 && filteredOrders.length === 0 && (
-              <div className="alert alert-info" role="alert">
-                No orders found matching your search.
-              </div>
-            )}
-            {!loading && !error && filteredOrders.length > 0 && (
+            {!loading && !error && orders.length > 0 && (
               <div className="row">
-                {filteredOrders.map((order) => (
-                  <div key={order.transactionCode} className="col-md-6 col-lg-4 mb-3">
+                {orders.map((order) => (
+                  <div key={order.orderId} className="col-md-6 col-lg-4 mb-3">
                     <div 
                       className="card h-100 shadow-sm cursor-pointer"
-                      onClick={() => handleOrderClick(order.transactionCode)}
+                      onClick={() => handleOrderClick(order.orderId)}
                       style={{ cursor: 'pointer' }}
                     >
                       <div className="card-body">
                         <h5 className="card-title">
-                          {order.transactionCode}
+                          Order #{order.orderId}
                         </h5>
                         <p className="card-text">
                           <strong>Status:</strong> 

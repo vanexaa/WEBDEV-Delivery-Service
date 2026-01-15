@@ -9,12 +9,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for token in URL params (from auth-app redirect)
+    // Check for token in URL params (from auth-app redirect) - optional authentication
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token');
 
     if (tokenFromUrl) {
-      console.log('Customer App: Token found in URL, attempting authentication...');
+      console.log('Customer App: Token found in URL, attempting authentication (optional)...');
       
       // IMPORTANT: Clear any old tokens/data first to prevent conflicts
       localStorage.removeItem('authToken');
@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
       setToken(tokenFromUrl);
       localStorage.setItem('authToken', tokenFromUrl);
       
-      // Fetch user data using the token
+      // Fetch user data using the token (but don't fail if it doesn't work)
       const fetchUserData = async () => {
         try {
           const response = await fetch('http://localhost:5001/api/auth/me', {
@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
               localStorage.setItem('user', JSON.stringify(normalizedUserData));
             }
           } else {
-            // Response not OK - clear invalid token
+            // Response not OK - clear invalid token but continue
             console.warn('Customer App: Authentication response not OK:', response.status);
             localStorage.removeItem('authToken');
             setToken(null);
@@ -65,8 +65,8 @@ export const AuthProvider = ({ children }) => {
           // Clear URL params
           window.history.replaceState({}, document.title, window.location.pathname);
         } catch (error) {
-          console.warn('Customer App: Authentication failed:', error);
-          // Clear invalid token but continue
+          console.warn('Customer App: Optional authentication failed, continuing without auth:', error);
+          // Clear invalid token but continue without authentication
           localStorage.removeItem('authToken');
           setToken(null);
         } finally {
@@ -76,7 +76,7 @@ export const AuthProvider = ({ children }) => {
       
       fetchUserData();
     } else {
-      // Check for stored auth data
+      // Check for stored auth data (optional)
       const storedToken = localStorage.getItem('authToken');
       const storedUser = localStorage.getItem('user');
 
