@@ -1,70 +1,58 @@
-# Unified Login App
+# Unified Frontend App
 
-## Overview
+This is a unified frontend application that combines all three apps (Rider, Customer, Admin) into a single app running on **port 3000**.
 
-This is a **unified login application** with a single login page for all user roles (Rider, Admin, Customer). After authentication, users are automatically routed to their role-specific dashboard.
+## Setup
 
-## Features
-
-- ✅ **Single Login Page** - One login form for all users
-- ✅ **User Authentication Only** - Simple username/password login
-- ✅ **Role-Based Routing** - Automatically routes to the correct dashboard based on user role
-- ✅ **Unified Experience** - One app, multiple dashboards
-
-## Getting Started
-
-### Installation
-
+1. Install dependencies:
 ```bash
 cd Frontend/unified-app
 npm install
 ```
 
-### Run Development Server
+2. Copy page files from individual apps:
+   - Copy pages from `rider-app/src/pages/*` to `unified-app/src/pages/rider/`
+   - Copy pages from `customer-app/src/pages/*` to `unified-app/src/pages/customer/`
+   - Copy pages from `admin-app/src/pages/*` to `unified-app/src/pages/admin/`
+   - Copy components from all apps to `unified-app/src/components/`
 
+3. Run the app:
 ```bash
 npm run dev
 ```
 
-The app will open at: http://localhost:3000
+The app will start on **http://localhost:3000**
 
-## Usage
+## How It Works
 
-### Login
+- **Single Port**: All frontend functionality runs on port 3000
+- **Role-Based Routing**: After login, users are redirected to their role-specific dashboard:
+  - Admin → `/admin/dashboard`
+  - Rider → `/rider/dashboard`
+  - Customer → `/customer/track`
+- **Unified API**: All API calls go to UnifiedService on port 5000
 
-1. Open http://localhost:3000
-2. Enter your credentials:
-   - **Rider:** Username: `rider1`, Password: `password123`
-   - **Admin:** Username: `admin`, Password: `password123`
-   - **Customer:** Username: `customer1`, Password: `password123`
-3. Click "Login"
-4. You'll be automatically redirected to your role-specific dashboard:
-   - Riders → `/rider` (Rider Dashboard)
-   - Admins → `/admin` (Admin Dashboard)
-   - Customers → `/customer` (Customer Dashboard)
+## Structure
 
-## Routes
+```
+unified-app/
+├── src/
+│   ├── pages/
+│   │   ├── LoginPage.jsx
+│   │   ├── rider/
+│   │   ├── customer/
+│   │   └── admin/
+│   ├── components/
+│   ├── services/
+│   │   └── api.js (unified API service)
+│   ├── App.jsx (role-based routing)
+│   └── main.jsx
+```
 
-- `/login` - Unified login page
-- `/` - Auto-redirects based on user role
-- `/rider` - Rider dashboard (protected, Rider role only)
-- `/admin` - Admin dashboard (protected, Admin role only)
-- `/customer` - Customer dashboard (protected, Customer role only)
+## Benefits
 
-## Architecture
-
-- **Single Login Page** - Accepts any user role
-- **Role-Based Routing** - After login, routes based on user role
-- **Protected Routes** - Each dashboard is protected and role-specific
-- **Shared Components** - Navbar adapts based on user role
-
-## Differences from Separate Apps
-
-- ✅ One login page instead of three
-- ✅ One app instead of three separate apps
-- ✅ Automatic role-based routing
-- ✅ Simpler setup (one app to run)
-
----
-
-**Unified login with role-based dashboards!** 🚀
+- ✅ One port for frontend (3000)
+- ✅ One port for backend (5000)
+- ✅ Single `npm run dev` command
+- ✅ Easier to manage and deploy
+- ✅ Role-based access control built-in

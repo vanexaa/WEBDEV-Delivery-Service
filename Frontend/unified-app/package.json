@@ -1,7 +1,7 @@
 {
-  "name": "unified-app",
-  "private": true,
+  "name": "unified-frontend-app",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",

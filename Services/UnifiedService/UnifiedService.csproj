@@ -1,0 +1,31 @@
+<!--
+  UnifiedService - Single Port Architecture
+  
+  This project consolidates all microservices (Auth, Delivery, Rider, Order, Customer)
+  into a single backend application running on port 5000.
+  
+  Benefits:
+  - One service to run instead of five
+  - One port to manage (5000)
+  - Easier to start/stop
+  - No API Gateway needed
+  - Faster startup and easier debugging
+  - Still organized: Controllers separated by domain, each with own database
+-->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.16" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+</Project>

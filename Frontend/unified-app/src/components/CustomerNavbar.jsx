@@ -1,11 +1,11 @@
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
 
 const CustomerNavbar = () => {
-  const { logout, user } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout, user } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -13,46 +13,35 @@ const CustomerNavbar = () => {
   };
 
   const isActive = (path) => {
-    return location.pathname === path ? 'active' : '';
+    return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-success">
+    <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
       <div className="container-fluid">
-        <span className="navbar-brand">
-          <i className="bi bi-cart-check"></i> Customer Dashboard
-        </span>
+        <Link className="navbar-brand" to="/customer/orders">
+          <i className="bi bi-cart-check"></i> Customer Portal
+        </Link>
         <button
           className="navbar-toggler"
           type="button"
           data-bs-toggle="collapse"
-          data-bs-target="#customerNavbar"
-          aria-controls="customerNavbar"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
+          data-bs-target="#navbarNav"
         >
           <span className="navbar-toggler-icon"></span>
         </button>
-        <div className="collapse navbar-collapse" id="customerNavbar">
-          <ul className="navbar-nav me-auto">
+        <div className="collapse navbar-collapse" id="navbarNav">
+          <ul className="navbar-nav ms-auto">
             <li className="nav-item">
-              <button
-                className={`nav-link btn btn-link text-light ${isActive('/customer')}`}
-                onClick={() => navigate('/customer')}
-              >
-                <i className="bi bi-house-door"></i> Dashboard
-              </button>
+              <Link className={`nav-link ${isActive('/customer/orders') ? 'active' : ''}`} to="/customer/orders">
+                <i className="bi bi-list-ul"></i> My Orders
+              </Link>
             </li>
             <li className="nav-item">
-              <button
-                className={`nav-link btn btn-link text-light ${isActive('/customer/track')}`}
-                onClick={() => navigate('/customer/track')}
-              >
-                <i className="bi bi-truck"></i> Track Order
-              </button>
+              <Link className={`nav-link ${isActive('/customer/orders-test') ? 'active' : ''}`} to="/customer/orders-test">
+                <i className="bi bi-bag-plus"></i> Create Order
+              </Link>
             </li>
-          </ul>
-          <ul className="navbar-nav">
             <li className="nav-item">
               <span className="nav-link">Welcome, {user?.username}</span>
             </li>

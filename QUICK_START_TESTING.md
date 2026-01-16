@@ -1,68 +1,36 @@
-# Quick Start - Testing All Services
+# Quick Start - Testing UnifiedService
 
 ## 🚀 Fastest Way to Test Everything
 
-### Step 1: Start All Backend Services
+### Step 1: Start UnifiedService
 
-Open **5 separate PowerShell/Command Prompt windows** and run these commands:
+Open a PowerShell/Command Prompt window and run:
 
-**Window 1 - Auth Service:**
 ```powershell
-cd "c:\Users\Paula\Desktop\Delivery Service - Microservices\Services\AuthService"
+cd "c:\Users\Paula\Desktop\Delivery Service - Microservices\Services\UnifiedService"
 dotnet run
 ```
-Wait until you see: `Now listening on: http://localhost:5001`
 
-**Window 2 - Delivery Service:**
-```powershell
-cd "c:\Users\Paula\Desktop\Delivery Service - Microservices\Services\DeliveryService"
-dotnet run
-```
-Wait until you see: `Now listening on: http://localhost:5003`
-
-**Window 3 - Rider Service:**
-```powershell
-cd "c:\Users\Paula\Desktop\Delivery Service - Microservices\Services\RiderService"
-dotnet run
-```
-Wait until you see: `Now listening on: http://localhost:5005`
-
-**Window 4 - Customer Service:**
-```powershell
-cd "c:\Users\Paula\Desktop\Delivery Service - Microservices\Services\CustomerService"
-dotnet run
-```
-Wait until you see: `Now listening on: http://localhost:5007`
-
-**Window 5 - Order Service:**
-```powershell
-cd "c:\Users\Paula\Desktop\Delivery Service - Microservices\Services\OrderService"
-dotnet run
-```
-Wait until you see: `Now listening on: http://localhost:5009`
+Wait until you see: `Now listening on: http://localhost:5000`
 
 ---
 
-### Step 2: Verify Services Are Running
+### Step 2: Verify Service is Running
 
-Open these URLs in your browser to check Swagger UI:
-- ✅ http://localhost:5001/swagger (Auth Service)
-- ✅ http://localhost:5003/swagger (Delivery Service)
-- ✅ http://localhost:5005/swagger (Rider Service)
-- ✅ http://localhost:5007/swagger (Customer Service)
-- ✅ http://localhost:5009/swagger (Order Service)
+Open this URL in your browser to check Swagger UI:
+- ✅ http://localhost:5000/swagger
 
-If you see Swagger UI, services are running! ✅
+If you see Swagger UI, UnifiedService is running! ✅
 
 ---
 
 ### Step 3: Run Automated Tests
 
-Once all services are running, open a **new PowerShell window** and run:
+Once UnifiedService is running, open a **new PowerShell window** and run:
 
 ```powershell
 cd "c:\Users\Paula\Desktop\Delivery Service - Microservices"
-.\test-services.ps1
+.\quick-test.ps1
 ```
 
 This will automatically test all endpoints!
@@ -73,8 +41,8 @@ This will automatically test all endpoints!
 
 ### Using Swagger UI (Recommended)
 
-1. **Open Swagger for Auth Service:**
-   - Go to: http://localhost:5001/swagger
+1. **Open Swagger:**
+   - Go to: http://localhost:5000/swagger
    - Find `POST /api/auth/login`
    - Click "Try it out"
    - Enter:
@@ -113,13 +81,13 @@ Use these accounts to test different roles:
 ## 🔄 Complete Test Flow
 
 ### 1. Login as Admin
-- URL: http://localhost:5001/swagger
+- URL: http://localhost:5000/swagger
 - Endpoint: `POST /api/auth/login`
 - Body: `{"username": "admin", "password": "password123"}`
 - **Save the token!**
 
 ### 2. Create an Order
-- URL: http://localhost:5009/swagger
+- URL: http://localhost:5000/swagger
 - Endpoint: `POST /api/orders`
 - Use the admin token from step 1
 - Body:
@@ -136,7 +104,7 @@ Use these accounts to test different roles:
 - **Save the orderId from response!**
 
 ### 3. Assign Delivery
-- URL: http://localhost:5003/swagger
+- URL: http://localhost:5000/swagger
 - Endpoint: `POST /api/deliveries/assign`
 - Use admin token
 - Body:
@@ -148,14 +116,14 @@ Use these accounts to test different roles:
   ```
 
 ### 4. Login as Rider
-- URL: http://localhost:5001/swagger
+- URL: http://localhost:5000/swagger
 - Endpoint: `POST /api/auth/login`
 - Body: `{"username": "rider1", "password": "password123"}`
 - **Save the rider token!**
 
 ### 5. Update Delivery Status
-- URL: http://localhost:5003/swagger
-- Endpoint: `PUT /api/deliveries/{deliveryId}/status`
+- URL: http://localhost:5000/swagger
+- Endpoint: `PUT /api/deliveries/{orderId}/status`
 - Use rider token
 - Body: `{"status": "InTransit"}`
 
@@ -164,13 +132,13 @@ Use these accounts to test different roles:
 - Body: `{"status": "Delivered"}`
 
 ### 7. Login as Customer
-- URL: http://localhost:5001/swagger
+- URL: http://localhost:5000/swagger
 - Endpoint: `POST /api/auth/login`
 - Body: `{"username": "customer1", "password": "password123"}`
 - **Save the customer token!**
 
 ### 8. Submit Feedback
-- URL: http://localhost:5007/swagger
+- URL: http://localhost:5000/swagger
 - Endpoint: `POST /api/customers/{orderId}/feedback`
 - Use customer token
 - Body:
@@ -187,20 +155,21 @@ Use these accounts to test different roles:
 
 Test these in order:
 
-- [ ] **Auth Service** - Login works (all 3 roles)
-- [ ] **Order Service** - Create order works
-- [ ] **Delivery Service** - Assign delivery works
-- [ ] **Delivery Service** - Update status works
-- [ ] **Rider Service** - Get rider profile works
-- [ ] **Customer Service** - Get rider info works
-- [ ] **Customer Service** - Submit feedback works
+- [ ] **UnifiedService** - Service starts on port 5000
+- [ ] **Auth API** - Login works (all 3 roles)
+- [ ] **Order API** - Create order works
+- [ ] **Delivery API** - Assign delivery works
+- [ ] **Delivery API** - Update status works
+- [ ] **Rider API** - Get rider profile works
+- [ ] **Customer API** - Get rider info works
+- [ ] **Customer API** - Submit feedback works
 
 ---
 
 ## 🆘 Troubleshooting
 
 ### "Cannot connect to service"
-**Fix:** Make sure the service is running. Check the terminal window for that service.
+**Fix:** Make sure UnifiedService is running. Check the terminal window.
 
 ### "401 Unauthorized"
 **Fix:** 
@@ -211,22 +180,23 @@ Test these in order:
 **Fix:**
 - Check the service terminal for error messages
 - Make sure SQL Server is running
-- Check database connection strings
+- Check database connection strings in `appsettings.json`
 
 ### Service won't start
 **Fix:**
 - Make sure SQL Server is running
-- Check if port is already in use
+- Check if port 5000 is already in use
 - Look at error messages in terminal
 
 ---
 
 ## 📚 More Help
 
-- **Detailed Testing Guide:** See `TESTING_GUIDE.md`
+- **Architecture:** See `ARCHITECTURE.md`
 - **API Documentation:** See `API_DOCUMENTATION.md`
-- **Run Instructions:** See `RUN_INSTRUCTIONS.md`
+- **Run Instructions:** See `HOW_TO_RUN.md`
+- **Login Instructions:** See `HOW_TO_RUN_LOGIN.md`
 
 ---
 
-**Need more help?** Check the service terminal windows for error messages, or look at the Swagger UI for endpoint details!
+**Need more help?** Check the UnifiedService terminal window for error messages, or look at the Swagger UI for endpoint details!

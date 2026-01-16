@@ -1,128 +1,85 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './utils/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
-import CustomerDashboard from './pages/CustomerDashboard';
-import TrackOrderPage from './pages/TrackOrderPage';
+import { AuthProvider } from './utils/AuthContext';
+
+// Rider pages
+import RiderDashboard from './pages/rider/DashboardPage';
+import RiderOrderDetails from './pages/rider/OrderDetailsPage';
+import RiderDeliveryHistory from './pages/rider/DeliveryHistoryPage';
+import RiderProfile from './pages/rider/ProfilePage';
+import RiderDetails from './pages/rider/RiderDetailsPage';
+
+// Customer pages
+import CustomerOrdersPage from './pages/customer/CustomerOrdersPage';
+import OrdersPage from './pages/customer/OrdersPage';
+
+// Admin pages
+import AdminDashboard from './pages/admin/DashboardPage';
+import AdminRiders from './pages/admin/RidersPage';
+import AdminDeliveries from './pages/admin/DeliveriesPage';
+import AdminHistory from './pages/admin/HistoryPage';
+
 import './App.css';
-
-// Protected Route Component with Role-based routing
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user } = useAuth();
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
-  
-  if (allowedRoles && !allowedRoles.includes(user?.role)) {
-    return <Navigate to="/login" />;
-  }
-  
-  return children;
-};
-
-// Role-based redirect after login
-const RoleRedirect = () => {
-  const { user, loading } = useAuth();
-
-  React.useEffect(() => {
-    if (!loading && user) {
-      // Check if user is returning from a failed redirect (to prevent loop)
-      const urlParams = new URLSearchParams(window.location.search);
-      const clearSession = urlParams.get('clearSession');
-      
-      if (clearSession === 'true') {
-        // User came back from rider-app with clearSession flag
-        // Clear the session and redirect to login
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        sessionStorage.removeItem('rider_redirect_attempted');
-        window.location.href = '/login';
-        return;
-      }
-      
-      // Only check redirect flag if we're on the root path (not after navigation)
-      // This prevents the flag from interfering with fresh logins
-      const redirectAttempted = sessionStorage.getItem('rider_redirect_attempted');
-      const currentPath = window.location.pathname;
-      
-      // If flag exists and we're at root, it means a previous redirect failed
-      // But only act on it if we haven't navigated away yet
-      if (redirectAttempted && currentPath === '/') {
-        // Clear the flag and allow fresh redirect attempt
-        sessionStorage.removeItem('rider_redirect_attempted');
-      }
-      
-      if (user.role === 'Rider') {
-        // Get token from localStorage
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          // Set flag to prevent redirect loop
-          sessionStorage.setItem('rider_redirect_attempted', 'true');
-          // Redirect to rider-app with token in URL
-          // User data will be fetched by rider-app using the token
-          window.location.href = `http://localhost:3001/?token=${encodeURIComponent(token)}`;
-        }
-      } else if (user.role === 'Admin') {
-        // Get token from localStorage
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          // Redirect to admin-app with token in URL
-          window.location.href = `http://localhost:3001/?token=${encodeURIComponent(token)}`;
-        }
-      }
-    }
-  }, [user, loading]);
-
-  if (loading) {
-    return <div className="d-flex justify-content-center align-items-center vh-100">
-      <div className="spinner-border" role="status">
-        <span className="visually-hidden">Loading...</span>
-      </div>
-    </div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
-
-  if (user.role === 'Customer') {
-    return <Navigate to="/customer" />;
-  }
-
-  // For Rider and Admin, redirect is handled in useEffect
-  return <div className="d-flex justify-content-center align-items-center vh-100">
-    <div className="spinner-border" role="status">
-      <span className="visually-hidden">Redirecting...</span>
-    </div>
-  </div>;
-};
 
 function App() {
   return (
     <AuthProvider>
       <Routes>
+        {/* Login route - accessible to all */}
         <Route path="/login" element={<LoginPage />} />
+        
+        {/* Default redirect to login */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        
+        {/* Rider routes */}
         <Route
-          path="/"
-          element={<RoleRedirect />}
-        />
-        <Route
-          path="/customer"
+          path="/rider/*"
           element={
-            <ProtectedRoute allowedRoles={['Customer']}>
-              <CustomerDashboard />
+            <ProtectedRoute requiredRole="Rider">
+              <Routes>
+                <Route path="dashboard" element={<RiderDashboard />} />
+                <Route path="details" element={<RiderDetails />} />
+                <Route path="orders/:transactionCode" element={<RiderOrderDetails />} />
+                <Route path="history" element={<RiderDeliveryHistory />} />
+                <Route path="profile" element={<RiderProfile />} />
+                <Route path="*" element={<Navigate to="/rider/dashboard" replace />} />
+              </Routes>
             </ProtectedRoute>
           }
         />
+        
+        {/* Customer routes */}
         <Route
-          path="/customer/track"
+          path="/customer/*"
           element={
-            <ProtectedRoute allowedRoles={['Customer']}>
-              <TrackOrderPage />
+            <ProtectedRoute requiredRole="Customer">
+              <Routes>
+                <Route path="orders" element={<CustomerOrdersPage />} />
+                <Route path="orders-test" element={<OrdersPage />} />
+                <Route path="*" element={<Navigate to="/customer/orders" replace />} />
+              </Routes>
             </ProtectedRoute>
           }
         />
+        
+        {/* Admin routes */}
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute requiredRole="Admin">
+              <Routes>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="riders" element={<AdminRiders />} />
+                <Route path="deliveries" element={<AdminDeliveries />} />
+                <Route path="history" element={<AdminHistory />} />
+                <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+              </Routes>
+            </ProtectedRoute>
+          }
+        />
+        
       </Routes>
     </AuthProvider>
   );
