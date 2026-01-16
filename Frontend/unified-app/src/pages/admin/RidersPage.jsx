@@ -44,12 +44,20 @@ const RidersPage = () => {
   const loadRiders = async () => {
     try {
       setLoading(true);
-      const data = await riderService.getAllRiders();
+      console.log('[RidersPage] Loading riders...');
+      
+      // Try to get riders with availability, fallback to regular endpoint
+      const data = await riderService.getAllRidersWithAvailability().catch(err => {
+        console.warn('[RidersPage] Failed to get riders with availability, using fallback:', err);
+        return riderService.getAllRiders();
+      });
+      
+      console.log('[RidersPage] Loaded riders:', data?.length || 0);
       setRiders(data || []);
       setError('');
     } catch (err) {
       setError('Failed to load riders.');
-      console.error('Error loading riders:', err);
+      console.error('[RidersPage] Error loading riders:', err);
     } finally {
       setLoading(false);
     }
@@ -141,27 +149,37 @@ const RidersPage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredRiders.map((rider) => (
-                        <tr key={rider.riderId}>
-                          <td>{rider.fullName}</td>
-                          <td>{rider.phoneNumber}</td>
-                          <td>{rider.vehicleType}</td>
-                          <td>{rider.vehicleNumber || '-'}</td>
-                          <td>
-                            <span className={`badge ${rider.isOnline ? 'bg-success' : 'bg-secondary'}`}>
-                              {rider.isOnline ? 'Online' : 'Offline'}
-                            </span>
-                          </td>
-                          <td>
-                            <button 
-                              className="btn btn-sm btn-primary"
-                              onClick={() => handleViewRider(rider)}
-                            >
-                              View
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {filteredRiders.map((rider) => {
+                        // Handle both camelCase and PascalCase
+                        const riderId = rider.riderId || rider.RiderId;
+                        const fullName = rider.fullName || rider.FullName;
+                        const phoneNumber = rider.phoneNumber || rider.PhoneNumber;
+                        const vehicleType = rider.vehicleType || rider.VehicleType;
+                        const vehicleNumber = rider.vehicleNumber || rider.VehicleNumber;
+                        const isOnline = rider.isOnline || rider.IsOnline || false;
+                        
+                        return (
+                          <tr key={riderId}>
+                            <td>{fullName}</td>
+                            <td>{phoneNumber}</td>
+                            <td>{vehicleType}</td>
+                            <td>{vehicleNumber || '-'}</td>
+                            <td>
+                              <span className={`badge ${isOnline ? 'bg-success' : 'bg-secondary'}`}>
+                                {isOnline ? 'Online' : 'Offline'}
+                              </span>
+                            </td>
+                            <td>
+                              <button 
+                                className="btn btn-sm btn-primary"
+                                onClick={() => handleViewRider(rider)}
+                              >
+                                View
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

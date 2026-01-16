@@ -6,6 +6,7 @@
  */
 using DeliveryService.Models;
 using DeliveryService.Models.DTOs;
+using System.Collections.Generic;
 
 namespace DeliveryService.Services;
 
@@ -19,4 +20,6 @@ public interface IDeliveryService
     Task<Delivery?> MarkDeliveryAsFailedAsync(int deliveryId, string failureReason, int userId);
     Task<Delivery?> ReassignDeliveryAsync(int deliveryId, int newRiderId);
     Task<DeliveryTrackingDto?> GetDeliveryTrackingAsync(int orderId);
+    Task<List<Delivery>> GetAvailableDeliveriesAsync(int? riderId = null);
+    Task<List<DeliveryWithOrderDto>> GetActiveDeliveriesWithOrdersAsync();
 }

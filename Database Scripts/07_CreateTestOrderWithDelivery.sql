@@ -174,42 +174,17 @@ BEGIN
     RETURN;
 END
 
--- First, create DeliveryOrder record (required by DeliveryService)
--- This is a copy of the order in DeliveryServiceDB
-IF NOT EXISTS (SELECT 1 FROM [dbo].[Orders] WHERE OrderId = @OrderId)
+-- Note: Orders are stored ONLY in OrderServiceDB
+-- DeliveryServiceDB references orders by OrderId only (no duplication)
+-- Verify order exists in OrderServiceDB
+IF NOT EXISTS (SELECT 1 FROM OrderServiceDB.[dbo].[Orders] WHERE OrderId = @OrderId)
 BEGIN
-    INSERT INTO [dbo].[Orders] (
-        [OrderId],
-        [CustomerId],
-        [CustomerName],
-        [CustomerPhone],
-        [DeliveryAddress],
-        [SpecialInstructions],
-        [OrderTotal],
-        [PaymentMethod],
-        [OrderDate],
-        [Status]
-    )
-    SELECT 
-        [OrderId],
-        [CustomerId],
-        [CustomerName],
-        [CustomerPhone],
-        [DeliveryAddress],
-        [SpecialInstructions],
-        [OrderTotal],
-        [PaymentMethod],
-        [OrderDate],
-        [Status]
-    FROM OrderServiceDB.[dbo].[Orders]
-    WHERE OrderId = @OrderId;
-    
-    PRINT '✓ DeliveryOrder record created in DeliveryServiceDB';
+    PRINT '⚠ ERROR: Order not found in OrderServiceDB';
+    RETURN;
 END
-ELSE
-BEGIN
-    PRINT '✓ DeliveryOrder record already exists in DeliveryServiceDB';
-END
+
+PRINT '✓ Order found in OrderServiceDB: OrderId = ' + CAST(@OrderId AS NVARCHAR(10));
+PRINT '  Deliveries will reference this order by OrderId only';
 
 -- Delete existing delivery if it exists
 IF EXISTS (SELECT 1 FROM [dbo].[Deliveries] WHERE OrderId = @OrderId)

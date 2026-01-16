@@ -1,6 +1,9 @@
 import React from 'react';
 
 const RiderInfoCard = ({ riderInfo }) => {
+  // Debug: Log riderInfo to see what data is being passed
+  console.log('RiderInfoCard received riderInfo:', riderInfo);
+  
   // Display rider info with proper field mapping
   // RiderInfoDto has: FullName, PhoneNumber, VehicleType, VehicleNumber, Rating, RiderId
   const displayName = riderInfo?.fullName || riderInfo?.FullName || riderInfo?.name || 'Driver';
@@ -13,6 +16,12 @@ const RiderInfoCard = ({ riderInfo }) => {
   const displayPlate = riderInfo?.vehicleNumber || riderInfo?.VehicleNumber || 
                        riderInfo?.plateNumber || riderInfo?.PlateNumber || 
                        riderInfo?.vehicleType || riderInfo?.VehicleType || 'N/A';
+
+  // Don't render if riderInfo is null/undefined
+  if (!riderInfo) {
+    console.log('RiderInfoCard: No riderInfo provided, not rendering');
+    return null;
+  }
 
   return (
     <div style={{ marginBottom: '24px', marginTop: '10px' }}>

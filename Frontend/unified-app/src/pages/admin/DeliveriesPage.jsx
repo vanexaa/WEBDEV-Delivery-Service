@@ -16,17 +16,32 @@ const DeliveriesPage = () => {
 
   useEffect(() => {
     loadDeliveries();
-  }, []);
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      console.log('[DeliveriesPage] Auto-refreshing deliveries...');
+      loadDeliveries();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDeliveries = async () => {
     try {
       setLoading(true);
-      const data = await deliveryService.getActiveDeliveries();
-      setDeliveries(data);
+      console.log('[DeliveriesPage] Loading deliveries...');
+      
+      // Try to get deliveries with order info, fallback to regular endpoint
+      const data = await deliveryService.getActiveDeliveriesWithOrders().catch(err => {
+        console.warn('[DeliveriesPage] Failed to get deliveries with orders, using fallback:', err);
+        return deliveryService.getActiveDeliveries();
+      });
+      
+      console.log('[DeliveriesPage] Loaded deliveries:', data?.length || 0);
+      setDeliveries(data || []);
       setError('');
     } catch (err) {
+      console.error('[DeliveriesPage] Error loading deliveries:', err);
       setError('Failed to load deliveries.');
-      console.error('Error loading deliveries:', err);
     } finally {
       setLoading(false);
     }
@@ -48,11 +63,25 @@ const DeliveriesPage = () => {
     try {
       setSelectedDelivery(delivery);
       setLoadingRiders(true);
-      const riders = await riderService.getAllRiders();
-      setAvailableRiders(riders.filter(r => r.isOnline) || []);
+      console.log('[DeliveriesPage] Loading riders for reassignment...');
+      
+      // Try to get riders with availability, fallback to regular endpoint
+      const riders = await riderService.getAllRidersWithAvailability().catch(err => {
+        console.warn('[DeliveriesPage] Failed to get riders with availability, using fallback:', err);
+        return riderService.getAllRiders();
+      });
+      
+      // Filter online riders - handle both camelCase and PascalCase
+      const onlineRiders = (riders || []).filter(r => {
+        const isOnline = r.isOnline || r.IsOnline || false;
+        return isOnline;
+      });
+      
+      console.log('[DeliveriesPage] Found online riders:', onlineRiders.length);
+      setAvailableRiders(onlineRiders);
       setShowReassignModal(true);
     } catch (err) {
-      console.error('Error loading riders:', err);
+      console.error('[DeliveriesPage] Error loading riders:', err);
       setAvailableRiders([]);
       setShowReassignModal(true);
     } finally {
@@ -65,14 +94,31 @@ const DeliveriesPage = () => {
     
     try {
       setReassigning(true);
-      await deliveryService.reassignDelivery(selectedDelivery.orderId, newRiderId);
+      const orderId = selectedDelivery.orderId || selectedDelivery.OrderId;
+      console.log('[DeliveriesPage] Reassigning delivery:', orderId, 'to rider:', newRiderId);
+      
+      if (!orderId) {
+        alert('Invalid order ID. Cannot reassign delivery.');
+        return;
+      }
+      
+      const result = await deliveryService.reassignDelivery(orderId, newRiderId);
+      console.log('[DeliveriesPage] Reassign result:', result);
+      
+      // Force refresh after a short delay to ensure backend has processed
+      await new Promise(resolve => setTimeout(resolve, 500));
       await loadDeliveries();
+      
       setShowReassignModal(false);
       setSelectedDelivery(null);
       setError('');
+      
+      alert('Delivery reassigned successfully!');
+      console.log('[DeliveriesPage] Deliveries refreshed after reassignment');
     } catch (err) {
-      setError('Failed to reassign delivery.');
-      console.error('Error reassigning delivery:', err);
+      console.error('[DeliveriesPage] Error reassigning delivery:', err);
+      setError(err.message || 'Failed to reassign delivery.');
+      alert(err.message || 'Failed to reassign delivery.');
     } finally {
       setReassigning(false);
     }
@@ -127,15 +173,21 @@ const DeliveriesPage = () => {
                         </tr>
                       ) : (
                         deliveries.map((delivery) => {
-                          const order = delivery.order || {};
+                          // Handle both DTO format (order property) and regular format
+                          const order = delivery.order || delivery.Order || {};
+                          const orderId = delivery.orderId || delivery.OrderId;
+                          const riderId = delivery.riderId || delivery.RiderId;
+                          const status = delivery.status || delivery.Status;
+                          const assignedAt = delivery.assignedAt || delivery.AssignedAt;
+                          
                           return (
-                            <tr key={delivery.orderId}>
-                              <td>#{delivery.orderId}</td>
-                              <td>{order.customerName || 'N/A'}</td>
+                            <tr key={orderId}>
+                              <td>#{orderId}</td>
+                              <td>{order.customerName || order.CustomerName || 'N/A'}</td>
                               <td>
-                                <span className="badge bg-primary">{delivery.status}</span>
+                                <span className="badge bg-primary">{status}</span>
                               </td>
-                              <td>{new Date(delivery.assignedAt).toLocaleString()}</td>
+                              <td>{assignedAt ? new Date(assignedAt).toLocaleString() : 'N/A'}</td>
                               <td>
                                 <button 
                                   className="btn btn-sm btn-primary me-2"
@@ -143,7 +195,7 @@ const DeliveriesPage = () => {
                                 >
                                   View
                                 </button>
-                                {delivery.riderId && (
+                                {riderId && (
                                   <button 
                                     className="btn btn-sm btn-warning"
                                     onClick={() => handleReassignClick(delivery)}

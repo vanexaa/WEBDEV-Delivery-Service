@@ -40,8 +40,15 @@ public class TokenService : ITokenService
             new Claim(ClaimTypes.Name, username),
             new Claim(ClaimTypes.Role, role),
             new Claim(JwtRegisteredClaimNames.Sub, username),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            // Add additional claims for easier access
+            new Claim("userId", userId.ToString()),
+            new Claim("username", username),
+            new Claim("role", role)
         };
+        
+        _logger.LogInformation("Generated JWT token for UserId={UserId}, Username={Username}, Role={Role}", 
+            userId, username, role);
 
         var token = new JwtSecurityToken(
             issuer: issuer,

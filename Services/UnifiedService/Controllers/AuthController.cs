@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using AuthService.Models;
 using AuthService.Services;
+using RiderService.Services;
 
 namespace AuthService.Controllers;
 
@@ -23,15 +24,18 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly ITokenService _tokenService;
+    private readonly IRiderService _riderService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IAuthService authService,
         ITokenService tokenService,
+        IRiderService riderService,
         ILogger<AuthController> logger)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
+        _riderService = riderService ?? throw new ArgumentNullException(nameof(riderService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -61,7 +65,39 @@ public class AuthController : ControllerBase
                 return Unauthorized(new { message = "Invalid username or password" });
             }
 
-            _logger.LogInformation("User {Username} logged in successfully", request.Username);
+            _logger.LogInformation("User {Username} logged in successfully - UserId={UserId}, Role={Role}", 
+                request.Username, response.User.UserId, response.User.Role);
+            
+            // If user is a rider, fetch and include riderId in response
+            if (response.User.Role == "Rider" || response.User.Role == "rider")
+            {
+                try
+                {
+                    _logger.LogInformation("Attempting to fetch riderId for UserId={UserId} during login", response.User.UserId);
+                    var rider = await _riderService.GetRiderByUserIdAsync(response.User.UserId);
+                    if (rider != null)
+                    {
+                        response.User.RiderId = rider.RiderId;
+                        _logger.LogInformation("RiderId={RiderId} included in login response for UserId={UserId}", 
+                            rider.RiderId, response.User.UserId);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Rider record not found for UserId={UserId} during login. Rider profile may need to be created.", response.User.UserId);
+                        // Continue without riderId - frontend will need to handle this case
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching riderId during login for UserId={UserId}: {Error}", response.User.UserId, ex.Message);
+                    // Continue without riderId - frontend can fetch it separately
+                }
+            }
+            
+            // Log token generation for debugging
+            _logger.LogDebug("Generated token for UserId={UserId}, Role={Role}, RiderId={RiderId}", 
+                response.User.UserId, response.User.Role, response.User.RiderId);
+            
             return Ok(response);
         }
         catch (Exception ex)
