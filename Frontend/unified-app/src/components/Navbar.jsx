@@ -53,6 +53,11 @@ const Navbar = () => {
               </Link>
             </li>
             <li className="nav-item">
+              <Link className={`nav-link ${isActive('/orders')}`} to="/orders">
+                Orders (Test)
+              </Link>
+            </li>
+            <li className="nav-item">
               <span className="nav-link">Welcome, {user?.username}</span>
             </li>
             <li className="nav-item">

@@ -210,7 +210,13 @@ public class RiderService : IRiderService
         {
             _logger.LogInformation("GetRiderOrdersAsync called for RiderId={RiderId}", riderId);
             
-            // Active delivery statuses
+            if (riderId <= 0)
+            {
+                _logger.LogWarning("Invalid riderId provided to GetRiderOrdersAsync: {RiderId}", riderId);
+                return new List<RiderOrderDto>();
+            }
+            
+            // Active delivery statuses - include "Assigned" so riders can see orders they need to accept
             var activeStatuses = new[] { "Assigned", "Accepted", "PickedUp", "InTransit" };
             
             // Get active deliveries for this rider from DeliveryServiceDB
@@ -221,11 +227,45 @@ public class RiderService : IRiderService
                 .AsNoTracking()
                 .ToListAsync();
 
-            _logger.LogInformation("Found {Count} active deliveries for RiderId={RiderId}", deliveries.Count, riderId);
-            
+            _logger.LogInformation("Found {Count} active deliveries for RiderId={RiderId}. Statuses: {Statuses}", 
+                deliveries.Count, riderId, string.Join(", ", deliveries.Select(d => d.Status)));
+
             if (!deliveries.Any())
             {
-                _logger.LogInformation("No active orders found for RiderId={RiderId}", riderId);
+                _logger.LogInformation("No active orders found for RiderId={RiderId}. Checking all deliveries...", riderId);
+                
+                // Debug: Check if there are any deliveries at all for this rider (any status)
+                var allDeliveriesForRider = await _deliveryContext.Deliveries
+                    .Where(d => d.RiderId.HasValue && d.RiderId.Value == riderId)
+                    .AsNoTracking()
+                    .ToListAsync();
+                    
+                _logger.LogInformation("Total deliveries for RiderId={RiderId} (any status): {Count}. Statuses: {Statuses}",
+                    riderId, allDeliveriesForRider.Count, 
+                    string.Join(", ", allDeliveriesForRider.Select(d => $"{d.DeliveryId}:{d.Status}")));
+                
+                // Also check for deliveries with "Pending" status that are assigned to this rider
+                // These might be orders waiting for rider acceptance
+                var pendingDeliveries = await _deliveryContext.Deliveries
+                    .Where(d => d.RiderId.HasValue && d.RiderId.Value == riderId && d.Status == "Pending")
+                    .AsNoTracking()
+                    .ToListAsync();
+                
+                if (pendingDeliveries.Any())
+                {
+                    _logger.LogWarning("Found {Count} deliveries with 'Pending' status for RiderId={RiderId}. These should have status 'Assigned' to be visible.",
+                        pendingDeliveries.Count, riderId);
+                }
+                
+                // Check for orders that are pending but don't have deliveries
+                var pendingOrders = await _orderContext.Orders
+                    .Where(o => o.Status == "Pending")
+                    .AsNoTracking()
+                    .ToListAsync();
+                
+                _logger.LogInformation("Found {Count} orders with 'Pending' status in OrderServiceDB (may not be assigned yet). OrderIds: {OrderIds}",
+                    pendingOrders.Count, string.Join(", ", pendingOrders.Select(o => o.OrderId)));
+                
                 return new List<RiderOrderDto>();
             }
 
@@ -237,6 +277,8 @@ public class RiderService : IRiderService
                 .Where(o => orderIds.Contains(o.OrderId))
                 .AsNoTracking()
                 .ToListAsync();
+
+            _logger.LogInformation("Fetched {Count} orders from OrderServiceDB for RiderId={RiderId}", orders.Count, riderId);
 
             // Map deliveries to RiderOrderDto with order information
             var riderOrders = new List<RiderOrderDto>();
@@ -256,16 +298,25 @@ public class RiderService : IRiderService
                         Status = delivery.Status ?? string.Empty,
                         AssignedAt = delivery.AssignedAt
                     });
+                    
+                    _logger.LogInformation("Mapped order: DeliveryId={DeliveryId}, OrderId={OrderId}, Status={Status}",
+                        delivery.DeliveryId, delivery.OrderId, delivery.Status);
+                }
+                else
+                {
+                    _logger.LogWarning("Order {OrderId} not found in OrderServiceDB for DeliveryId={DeliveryId}",
+                        delivery.OrderId, delivery.DeliveryId);
                 }
             }
 
-            _logger.LogInformation("Retrieved {Count} active orders for RiderId={RiderId}", riderOrders.Count, riderId);
+            _logger.LogInformation("Retrieved {Count} active orders for RiderId={RiderId}. Orders with 'Assigned' status: {AssignedCount}",
+                riderOrders.Count, riderId, riderOrders.Count(o => o.Status == "Assigned"));
             return riderOrders;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting rider orders for RiderId={RiderId}", riderId);
-            return new List<RiderOrderDto>();
+            _logger.LogError(ex, "Error getting rider orders for RiderId={RiderId}: {Error}", riderId, ex.Message);
+            throw;
         }
     }
 

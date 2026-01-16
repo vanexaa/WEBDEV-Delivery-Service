@@ -33,6 +33,15 @@ public class DeliveryDbContext : DbContext
             // Note: Orders are in OrderServiceDB, not DeliveryServiceDB
             // Delivery references OrderId but cannot use foreign key across databases
             // No navigation property configured - orders must be fetched separately from OrderServiceDB
+            
+            // Explicitly configure OrderId as a simple integer property (not a foreign key)
+            entity.Property(e => e.OrderId)
+                  .IsRequired()
+                  .HasComment("References OrderId in OrderServiceDB (no foreign key constraint)");
+            
+            // Do NOT configure any HasOne/HasForeignKey relationship for OrderId
+            // This ensures EF Core won't try to create a foreign key constraint
+            // If a foreign key exists in the database, it must be dropped manually via SQL script
         });
 
         modelBuilder.Entity<DeliveryStatusHistory>(entity =>

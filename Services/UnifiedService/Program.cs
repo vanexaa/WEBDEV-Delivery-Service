@@ -33,6 +33,7 @@ using OrderService.Data;
 using OrderService.Services;
 using CustomerService.Data;
 using CustomerService.Services;
+using UnifiedService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -113,9 +114,24 @@ builder.Services.AddHttpClient();
 // Register all application services
 builder.Services.AddScoped<IAuthService, AuthService.Services.AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IDeliveryService, DeliveryService.Services.DeliveryService>();
+builder.Services.AddScoped<IDeliveryService>(sp =>
+{
+    var deliveryContext = sp.GetRequiredService<DeliveryDbContext>();
+    var orderContext = sp.GetRequiredService<OrderDbContext>();
+    var riderContext = sp.GetRequiredService<RiderDbContext>();
+    var config = sp.GetRequiredService<IConfiguration>();
+    var logger = sp.GetRequiredService<ILogger<DeliveryService.Services.DeliveryService>>();
+    return new DeliveryService.Services.DeliveryService(deliveryContext, orderContext, riderContext, config, logger);
+});
 builder.Services.AddScoped<IRiderService, RiderService.Services.RiderService>();
-builder.Services.AddScoped<IOrderService, OrderService.Services.OrderService>();
+builder.Services.AddScoped<IOrderService>(sp =>
+{
+    var orderContext = sp.GetRequiredService<OrderDbContext>();
+    var deliveryService = sp.GetRequiredService<IDeliveryService>();
+    var riderContext = sp.GetRequiredService<RiderDbContext>();
+    var logger = sp.GetRequiredService<ILogger<OrderService.Services.OrderService>>();
+    return new OrderService.Services.OrderService(orderContext, deliveryService, riderContext, logger);
+});
 
 builder.Services.AddScoped<ICustomerService, CustomerService.Services.CustomerService>(sp =>
 {
@@ -125,6 +141,9 @@ builder.Services.AddScoped<ICustomerService, CustomerService.Services.CustomerSe
     var logger = sp.GetRequiredService<ILogger<CustomerService.Services.CustomerService>>();
     return new CustomerService.Services.CustomerService(httpClient, config, logger);
 });
+
+// Register background service for automatic order assignment
+builder.Services.AddHostedService<UnifiedService.Services.OrderAssignmentBackgroundService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

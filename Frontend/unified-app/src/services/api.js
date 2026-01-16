@@ -94,6 +94,13 @@ export const deliveryService = {
     return fetchApi(`${API_BASE_URL.delivery}/active`);
   },
   
+  getAvailableDeliveries: async (riderId = null) => {
+    const url = riderId 
+      ? `${API_BASE_URL.delivery}/available?riderId=${riderId}`
+      : `${API_BASE_URL.delivery}/available`;
+    return fetchApi(url);
+  },
+  
   getActiveDeliveriesWithOrders: async () => {
     return fetchApi(`${API_BASE_URL.delivery}/active/with-orders`);
   },
@@ -134,6 +141,20 @@ export const deliveryService = {
     return fetchApi(`${API_BASE_URL.delivery}/${orderId}/failure`, {
       method: 'PUT',
       body: JSON.stringify({ reason })
+    });
+  },
+  
+  acceptDelivery: async (orderId, riderId) => {
+    return fetchApi(`${API_BASE_URL.delivery}/${orderId}/accept`, {
+      method: 'POST',
+      body: JSON.stringify({ riderId })
+    });
+  },
+  
+  rejectDelivery: async (orderId, riderId) => {
+    return fetchApi(`${API_BASE_URL.delivery}/${orderId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ riderId })
     });
   }
 };
@@ -260,23 +281,48 @@ export const customerService = {
       method: 'POST',
       body: JSON.stringify({ rating, comment })
     });
+  },
+
+  // Helper: Get customerId from existing orders (workaround since we can't query Customer table directly)
+  // This assumes orders exist - if not, customerId might need to match userId
+  getCustomerIdFromOrders: async (userId) => {
+    try {
+      // Try to get all orders and find the customerId that matches
+      const allOrders = await orderService.getAllOrders();
+      if (Array.isArray(allOrders) && allOrders.length > 0) {
+        // Find an order that might be for this user
+        // We can't reliably match without Customer table access, so return userId as fallback
+        console.log('[customerService] Cannot reliably determine customerId without Customer table access');
+        return userId; // Fallback: use userId
+      }
+      return userId;
+    } catch (err) {
+      console.warn('[customerService] Error getting customerId from orders:', err);
+      return userId; // Fallback: use userId
+    }
   }
 };
 
 // Order Service
+// Order Service
 export const orderService = {
+  getAllOrders: async () => {
+    return fetchApi(`${API_BASE_URL.order}`);
+  },
+
   getOrderById: async (orderId) => {
     if (USE_MOCK_DATA && mockCustomerOrderService) {
       return mockCustomerOrderService.getOrderById(orderId);
     }
     return fetchApi(`${API_BASE_URL.order}/${orderId}`);
   },
-  
+
   getOrdersByCustomerId: async (customerId) => {
     return fetchApi(`${API_BASE_URL.order}/customer/${customerId}`);
   },
-  
+
   createOrder: async (orderData) => {
+    console.log('[orderService] Creating order with data:', orderData);
     return fetchApi(`${API_BASE_URL.order}`, {
       method: 'POST',
       body: JSON.stringify(orderData)

@@ -9,9 +9,11 @@ import RiderDashboard from './pages/rider/DashboardPage';
 import RiderOrderDetails from './pages/rider/OrderDetailsPage';
 import RiderDeliveryHistory from './pages/rider/DeliveryHistoryPage';
 import RiderProfile from './pages/rider/ProfilePage';
+import RiderDetails from './pages/rider/RiderDetailsPage';
 
 // Customer pages
-import CustomerTrackOrder from './pages/customer/TrackOrderPage';
+import CustomerOrdersPage from './pages/customer/CustomerOrdersPage';
+import OrdersPage from './pages/customer/OrdersPage';
 
 // Admin pages
 import AdminDashboard from './pages/admin/DashboardPage';
@@ -38,6 +40,7 @@ function App() {
             <ProtectedRoute requiredRole="Rider">
               <Routes>
                 <Route path="dashboard" element={<RiderDashboard />} />
+                <Route path="details" element={<RiderDetails />} />
                 <Route path="orders/:transactionCode" element={<RiderOrderDetails />} />
                 <Route path="history" element={<RiderDeliveryHistory />} />
                 <Route path="profile" element={<RiderProfile />} />
@@ -53,8 +56,9 @@ function App() {
           element={
             <ProtectedRoute requiredRole="Customer">
               <Routes>
-                <Route path="track" element={<CustomerTrackOrder />} />
-                <Route path="*" element={<Navigate to="/customer/track" replace />} />
+                <Route path="orders" element={<CustomerOrdersPage />} />
+                <Route path="orders-test" element={<OrdersPage />} />
+                <Route path="*" element={<Navigate to="/customer/orders" replace />} />
               </Routes>
             </ProtectedRoute>
           }
@@ -75,6 +79,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        
       </Routes>
     </AuthProvider>
   );

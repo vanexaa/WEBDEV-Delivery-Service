@@ -76,10 +76,16 @@ public class DeliveriesController : ControllerBase
                 message = "Delivery assigned successfully"
             });
         }
+        catch (InvalidOperationException ex)
+        {
+            // Handle validation errors (e.g., rider not online)
+            _logger.LogWarning("Assignment validation failed for OrderId={OrderId}: {Message}", request.OrderId, ex.Message);
+            return BadRequest(new { message = ex.Message });
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error assigning delivery for OrderId={OrderId}", request.OrderId);
-            return StatusCode(500, new { message = "An error occurred" });
+            _logger.LogError(ex, "Error assigning delivery for OrderId={OrderId}: {Error}", request.OrderId, ex.Message);
+            return StatusCode(500, new { message = "An error occurred", error = ex.Message });
         }
     }
 
@@ -302,6 +308,104 @@ public class DeliveriesController : ControllerBase
             return StatusCode(500, new { message = "An error occurred" });
         }
     }
+
+    /// <summary>
+    /// Accept a delivery assignment (Rider)
+    /// </summary>
+    [HttpPost("{orderId}/accept")]
+    public async Task<ActionResult> AcceptDelivery(int orderId, [FromBody] AcceptRejectRequest request)
+    {
+        if (orderId <= 0)
+        {
+            return BadRequest(new { message = "Invalid order ID" });
+        }
+
+        if (request == null || !request.RiderId.HasValue)
+        {
+            return BadRequest(new { message = "RiderId is required" });
+        }
+
+        try
+        {
+            var delivery = await _deliveryService.GetDeliveryByOrderIdAsync(orderId);
+            if (delivery == null)
+            {
+                _logger.LogWarning("Delivery not found for OrderId={OrderId}", orderId);
+                return NotFound(new { message = "Delivery not found" });
+            }
+
+            var updatedDelivery = await _deliveryService.AcceptDeliveryAsync(delivery.DeliveryId, request.RiderId.Value);
+            if (updatedDelivery == null)
+            {
+                return BadRequest(new { message = "Failed to accept delivery. It may not be assigned to you or is not in 'Assigned' status." });
+            }
+
+            _logger.LogInformation("Delivery accepted: DeliveryId={DeliveryId}, OrderId={OrderId}, RiderId={RiderId}",
+                updatedDelivery.DeliveryId, orderId, request.RiderId);
+            
+            return Ok(new { 
+                deliveryId = updatedDelivery.DeliveryId,
+                orderId = updatedDelivery.OrderId,
+                riderId = updatedDelivery.RiderId,
+                status = updatedDelivery.Status,
+                message = "Delivery accepted successfully. Order status updated to 'In Progress'."
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error accepting delivery for OrderId={OrderId}", orderId);
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Reject a delivery assignment (Rider)
+    /// </summary>
+    [HttpPost("{orderId}/reject")]
+    public async Task<ActionResult> RejectDelivery(int orderId, [FromBody] AcceptRejectRequest request)
+    {
+        if (orderId <= 0)
+        {
+            return BadRequest(new { message = "Invalid order ID" });
+        }
+
+        if (request == null || !request.RiderId.HasValue)
+        {
+            return BadRequest(new { message = "RiderId is required" });
+        }
+
+        try
+        {
+            var delivery = await _deliveryService.GetDeliveryByOrderIdAsync(orderId);
+            if (delivery == null)
+            {
+                _logger.LogWarning("Delivery not found for OrderId={OrderId}", orderId);
+                return NotFound(new { message = "Delivery not found" });
+            }
+
+            var updatedDelivery = await _deliveryService.RejectDeliveryAsync(delivery.DeliveryId, request.RiderId.Value);
+            if (updatedDelivery == null)
+            {
+                return BadRequest(new { message = "Failed to reject delivery. It may not be assigned to you or is not in 'Assigned' status." });
+            }
+
+            _logger.LogInformation("Delivery rejected: DeliveryId={DeliveryId}, OrderId={OrderId}, RiderId={RiderId}",
+                updatedDelivery.DeliveryId, orderId, request.RiderId);
+            
+            return Ok(new { 
+                deliveryId = updatedDelivery.DeliveryId,
+                orderId = updatedDelivery.OrderId,
+                status = updatedDelivery.Status,
+                riderId = updatedDelivery.RiderId,
+                message = "Delivery rejected. Order is available for reassignment to another rider."
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error rejecting delivery for OrderId={OrderId}", orderId);
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
 }
 
 /// <summary>
@@ -318,4 +422,12 @@ public class ReassignDeliveryRequest
 public class FailureRequest
 {
     public string Reason { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Request model for accepting or rejecting a delivery.
+/// </summary>
+public class AcceptRejectRequest
+{
+    public int? RiderId { get; set; }
 }

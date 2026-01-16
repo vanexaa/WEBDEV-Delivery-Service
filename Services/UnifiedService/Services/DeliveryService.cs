@@ -9,6 +9,7 @@ using DeliveryService.Models;
 using DeliveryService.Models.DTOs;
 using OrderService.Data;
 using OrderService.Models;
+using RiderService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -23,20 +24,24 @@ public class DeliveryService : IDeliveryService
 {
     private readonly DeliveryDbContext _context;
     private readonly OrderDbContext _orderContext;
+    private readonly RiderDbContext _riderContext;
     private readonly IConfiguration _configuration;
     private readonly ILogger<DeliveryService> _logger;
 
     private static readonly string[] ActiveStatuses = { "Assigned", "Accepted", "PickedUp", "InTransit" };
     private static readonly string[] ValidStatuses = { "Accepted", "PickedUp", "InTransit", "Delivered", "Failed" };
 
+    // Constructor with RiderDbContext for accept/reject/reassignment functionality
     public DeliveryService(
         DeliveryDbContext context, 
         OrderDbContext orderContext,
+        RiderDbContext riderContext,
         IConfiguration configuration, 
         ILogger<DeliveryService> logger)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _orderContext = orderContext ?? throw new ArgumentNullException(nameof(orderContext));
+        _riderContext = riderContext ?? throw new ArgumentNullException(nameof(riderContext));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -65,18 +70,73 @@ public class DeliveryService : IDeliveryService
                 return null;
             }
 
+            // Validate that rider is online before assignment (if RiderId is provided)
+            if (request.RiderId.HasValue && _riderContext != null)
+            {
+                try
+                {
+                    var riderAvailability = await _riderContext.RiderAvailability
+                        .FirstOrDefaultAsync(ra => ra.RiderId == request.RiderId.Value);
+
+                    if (riderAvailability == null)
+                    {
+                        // If availability record doesn't exist, log warning but allow assignment
+                        // (rider may not have set online status yet, but admin can still assign)
+                        _logger.LogWarning("Rider availability record not found for RiderId={RiderId} when assigning OrderId={OrderId}. Assignment will proceed, but rider should set online status.",
+                            request.RiderId.Value, request.OrderId);
+                        // Don't throw - allow assignment to proceed
+                    }
+                    else if (!riderAvailability.IsOnline)
+                    {
+                        // Rider exists but is offline - prevent assignment
+                        _logger.LogWarning("Cannot assign OrderId={OrderId} to RiderId={RiderId}: Rider is not online",
+                            request.OrderId, request.RiderId.Value);
+                        throw new InvalidOperationException($"Rider {request.RiderId.Value} is not online. Only online riders can be assigned orders. Please ask the rider to go online first.");
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Rider availability verified: RiderId={RiderId} is online for OrderId={OrderId}",
+                            request.RiderId.Value, request.OrderId);
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // Re-throw validation exceptions (rider offline)
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // If there's an error checking availability, log but don't block assignment
+                    // (could be a database issue, but assignment should still work)
+                    _logger.LogError(ex, "Error checking rider availability for RiderId={RiderId}: {Error}. Assignment will proceed.",
+                        request.RiderId.Value, ex.Message);
+                    // Don't throw - allow assignment to proceed despite availability check error
+                }
+            }
+
             // Check if delivery already exists
             var existingDelivery = await _context.Deliveries
                 .FirstOrDefaultAsync(d => d.OrderId == request.OrderId);
 
             if (existingDelivery != null)
             {
-                _logger.LogInformation("Delivery already exists for OrderId={OrderId}, DeliveryId={DeliveryId}, CurrentRiderId={CurrentRiderId}",
-                    request.OrderId, existingDelivery.DeliveryId, existingDelivery.RiderId);
+                _logger.LogInformation("Delivery already exists for OrderId={OrderId}, DeliveryId={DeliveryId}, CurrentRiderId={CurrentRiderId}, Status={Status}",
+                    request.OrderId, existingDelivery.DeliveryId, existingDelivery.RiderId, existingDelivery.Status);
                 
-                // Update existing delivery with new rider assignment
+                // If delivery already has an assigned rider with active status, don't overwrite
+                if (existingDelivery.RiderId.HasValue && 
+                    (existingDelivery.Status == "Assigned" || existingDelivery.Status == "Accepted" || 
+                     existingDelivery.Status == "PickedUp" || existingDelivery.Status == "InTransit"))
+                {
+                    _logger.LogInformation("Delivery for OrderId={OrderId} already assigned to RiderId={RiderId} with active status {Status}. Skipping assignment.",
+                        request.OrderId, existingDelivery.RiderId, existingDelivery.Status);
+                    return existingDelivery;
+                }
+                
+                // Update existing delivery with new rider assignment (for pending/unassigned deliveries)
                 if (request.RiderId.HasValue)
                 {
+                    var previousRiderId = existingDelivery.RiderId;
                     existingDelivery.RiderId = request.RiderId.Value;
                     existingDelivery.Status = "Assigned";
                     existingDelivery.AssignedAt = DateTime.UtcNow;
@@ -87,9 +147,9 @@ public class DeliveryService : IDeliveryService
                     {
                         DeliveryId = existingDelivery.DeliveryId,
                         Status = "Assigned",
-                        Notes = existingDelivery.RiderId != request.RiderId.Value 
-                            ? $"Reassigned to rider {request.RiderId.Value}" 
-                            : "Rider assignment updated",
+                        Notes = previousRiderId.HasValue && previousRiderId.Value != request.RiderId.Value
+                            ? $"Reassigned from rider {previousRiderId.Value} to rider {request.RiderId.Value}" 
+                            : "Rider assigned to pending delivery",
                         CreatedAt = DateTime.UtcNow
                     });
                     
@@ -461,6 +521,188 @@ public class DeliveryService : IDeliveryService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving available deliveries");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Accept a delivery assignment. Rider accepts the order and it moves to "Accepted" status.
+    /// Updates both Delivery status and Order status to "In Progress".
+    /// </summary>
+    public async Task<Delivery?> AcceptDeliveryAsync(int deliveryId, int riderId)
+    {
+        try
+        {
+            _logger.LogInformation("AcceptDeliveryAsync called: DeliveryId={DeliveryId}, RiderId={RiderId}", 
+                deliveryId, riderId);
+
+            var delivery = await _context.Deliveries.FindAsync(deliveryId);
+            if (delivery == null)
+            {
+                _logger.LogWarning("Delivery not found: DeliveryId={DeliveryId}", deliveryId);
+                return null;
+            }
+
+            // Verify the delivery is assigned to this rider
+            if (delivery.RiderId != riderId)
+            {
+                _logger.LogWarning("Delivery {DeliveryId} is not assigned to rider {RiderId}. Current rider: {CurrentRiderId}", 
+                    deliveryId, riderId, delivery.RiderId);
+                return null;
+            }
+
+            // Verify delivery is in "Assigned" status
+            if (delivery.Status != "Assigned")
+            {
+                _logger.LogWarning("Delivery {DeliveryId} cannot be accepted. Current status: {Status}", 
+                    deliveryId, delivery.Status);
+                return null;
+            }
+
+            // Update delivery status to "Accepted"
+            delivery.Status = "Accepted";
+            delivery.AcceptedAt = DateTime.UtcNow;
+            delivery.UpdatedAt = DateTime.UtcNow;
+
+            // Add status history
+            _context.DeliveryStatusHistory.Add(new DeliveryStatusHistory
+            {
+                DeliveryId = deliveryId,
+                Status = "Accepted",
+                ChangedBy = riderId,
+                Notes = "Rider accepted the order",
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            // Update Order status to "In Progress"
+            var order = await _orderContext.Orders.FindAsync(delivery.OrderId);
+            if (order != null)
+            {
+                order.Status = "In Progress";
+                await _orderContext.SaveChangesAsync();
+                _logger.LogInformation("Order {OrderId} status updated to 'In Progress'", order.OrderId);
+            }
+            else
+            {
+                _logger.LogWarning("Order {OrderId} not found when updating status", delivery.OrderId);
+            }
+
+            _logger.LogInformation("Delivery {DeliveryId} accepted by rider {RiderId}", deliveryId, riderId);
+            return delivery;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error accepting delivery: DeliveryId={DeliveryId}, RiderId={RiderId}", 
+                deliveryId, riderId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Reject a delivery assignment. The order becomes available for reassignment to another rider.
+    /// </summary>
+    public async Task<Delivery?> RejectDeliveryAsync(int deliveryId, int riderId)
+    {
+        try
+        {
+            _logger.LogInformation("RejectDeliveryAsync called: DeliveryId={DeliveryId}, RiderId={RiderId}", 
+                deliveryId, riderId);
+
+            var delivery = await _context.Deliveries.FindAsync(deliveryId);
+            if (delivery == null)
+            {
+                _logger.LogWarning("Delivery not found: DeliveryId={DeliveryId}", deliveryId);
+                return null;
+            }
+
+            // Verify the delivery is assigned to this rider
+            if (delivery.RiderId != riderId)
+            {
+                _logger.LogWarning("Delivery {DeliveryId} is not assigned to rider {RiderId}. Current rider: {CurrentRiderId}", 
+                    deliveryId, riderId, delivery.RiderId);
+                return null;
+            }
+
+            // Verify delivery is in "Assigned" status
+            if (delivery.Status != "Assigned")
+            {
+                _logger.LogWarning("Delivery {DeliveryId} cannot be rejected. Current status: {Status}", 
+                    deliveryId, delivery.Status);
+                return null;
+            }
+
+            // Clear rider assignment and set status to allow reassignment
+            // Option 1: Set RiderId to null and status to "Pending" (will be reassigned)
+            // Option 2: Keep RiderId but mark as "Rejected" and allow system to reassign
+            // We'll use Option 2 to maintain history
+            
+            var previousRiderId = delivery.RiderId;
+            delivery.Status = "Pending"; // Mark as pending for reassignment
+            delivery.RiderId = null; // Clear assignment
+            delivery.UpdatedAt = DateTime.UtcNow;
+
+            // Add status history
+            _context.DeliveryStatusHistory.Add(new DeliveryStatusHistory
+            {
+                DeliveryId = deliveryId,
+                Status = "Pending",
+                ChangedBy = riderId,
+                Notes = $"Rider {riderId} rejected the order. Available for reassignment.",
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            // Try to auto-assign to another available rider
+            try
+            {
+                var onlineRiders = await _riderContext!.RiderAvailability
+                    .Where(ra => ra.IsOnline == true && ra.RiderId != previousRiderId)
+                    .Select(ra => ra.RiderId)
+                    .ToListAsync();
+
+                if (onlineRiders.Any())
+                {
+                    var newRiderId = onlineRiders.First();
+                    _logger.LogInformation("Attempting to reassign OrderId={OrderId} to RiderId={RiderId}", 
+                        delivery.OrderId, newRiderId);
+
+                    var assignRequest = new AssignDeliveryRequest
+                    {
+                        OrderId = delivery.OrderId,
+                        RiderId = newRiderId
+                    };
+
+                    var reassignedDelivery = await AssignDeliveryAsync(assignRequest);
+                    if (reassignedDelivery != null)
+                    {
+                        _logger.LogInformation("Order {OrderId} successfully reassigned to Rider {RiderId}", 
+                            delivery.OrderId, newRiderId);
+                        return reassignedDelivery;
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("No other online riders available for OrderId={OrderId}. Order remains unassigned.", 
+                        delivery.OrderId);
+                }
+            }
+            catch (Exception reassignEx)
+            {
+                _logger.LogError(reassignEx, "Error during auto-reassignment of OrderId={OrderId}", 
+                    delivery.OrderId);
+                // Continue - delivery is already marked as rejected
+            }
+
+            _logger.LogInformation("Delivery {DeliveryId} rejected by rider {RiderId}", deliveryId, riderId);
+            return delivery;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error rejecting delivery: DeliveryId={DeliveryId}, RiderId={RiderId}", 
+                deliveryId, riderId);
             throw;
         }
     }

@@ -80,6 +80,36 @@ const AvailabilityToggle = () => {
     loadAvailability();
   }, [riderId]);
 
+  const getCurrentLocation = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        console.warn('[AvailabilityToggle] Geolocation not supported by browser');
+        // Use default location (can be configured) - example: Manila, Philippines
+        resolve({ latitude: 14.5995, longitude: 120.9842 });
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log('[AvailabilityToggle] Location obtained:', { latitude, longitude });
+          resolve({ latitude, longitude });
+        },
+        (error) => {
+          console.warn('[AvailabilityToggle] Geolocation error:', error);
+          // Use default location if geolocation fails or is denied
+          // Example: Manila, Philippines coordinates
+          resolve({ latitude: 14.5995, longitude: 120.9842 });
+        },
+        {
+          enableHighAccuracy: true, // Use GPS for high accuracy
+          timeout: 10000, // Allow up to 10 seconds for GPS to get accurate fix
+          maximumAge: 0 // Never use cached location - always get fresh GPS data
+        }
+      );
+    });
+  };
+
   const handleToggle = async () => {
     // Get riderId from context or localStorage
     let currentRiderId = riderId;
@@ -113,9 +143,22 @@ const AvailabilityToggle = () => {
       console.log(`[AvailabilityToggle] New status: ${newStatus}`);
       console.log(`[AvailabilityToggle] RiderId: ${numericRiderId}`);
       
-      // Update via API
-      console.log(`[AvailabilityToggle] Calling API: updateAvailability(${numericRiderId}, ${newStatus})`);
-      const result = await riderService.updateAvailability(numericRiderId, newStatus);
+      // Get location coordinates if going online
+      let latitude = null;
+      let longitude = null;
+      
+      if (newStatus) {
+        // Only fetch location when going online
+        console.log('[AvailabilityToggle] Fetching current location...');
+        const location = await getCurrentLocation();
+        latitude = location.latitude;
+        longitude = location.longitude;
+        console.log('[AvailabilityToggle] Location to send:', { latitude, longitude });
+      }
+      
+      // Update via API with location
+      console.log(`[AvailabilityToggle] Calling API: updateAvailability(${numericRiderId}, ${newStatus}, ${latitude}, ${longitude})`);
+      const result = await riderService.updateAvailability(numericRiderId, newStatus, latitude, longitude);
       console.log('[AvailabilityToggle] Availability update response:', result);
       
       // Optimistically update UI immediately

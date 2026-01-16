@@ -310,13 +310,17 @@ public class RidersController : ControllerBase
                 return StatusCode(500, new { message = "Failed to update availability" });
             }
 
-            _logger.LogInformation("Rider availability updated successfully: RiderId={RiderId}, IsOnline={IsOnline}",
-                riderId, availability.IsOnline);
+            _logger.LogInformation("Rider availability updated successfully: RiderId={RiderId}, IsOnline={IsOnline}, Latitude={Latitude}, Longitude={Longitude}",
+                riderId, availability.IsOnline, availability.CurrentLatitude, availability.CurrentLongitude);
             
-            // Return updated availability with success message
+            // Return updated availability with location data
             return Ok(new { 
+                riderId = availability.RiderId,
                 isOnline = availability.IsOnline,
+                currentLatitude = availability.CurrentLatitude,
+                currentLongitude = availability.CurrentLongitude,
                 lastSeen = availability.LastSeen,
+                updatedAt = availability.UpdatedAt,
                 message = $"Rider is now {(availability.IsOnline ? "online" : "offline")}"
             });
         }
