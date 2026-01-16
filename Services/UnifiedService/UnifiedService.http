@@ -1,0 +1,6 @@
+@UnifiedService_HostAddress = http://localhost:5087
+
+GET {{UnifiedService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
