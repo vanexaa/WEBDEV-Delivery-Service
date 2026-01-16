@@ -15,7 +15,8 @@ public class DeliveryDbContext : DbContext
     {
     }
 
-    public DbSet<DeliveryOrder> Orders { get; set; }
+    // Note: Orders are stored in OrderServiceDB, not DeliveryServiceDB
+    // DeliveryServiceDB only stores Deliveries which reference OrderId
     public DbSet<Delivery> Deliveries { get; set; }
     public DbSet<DeliveryStatusHistory> DeliveryStatusHistory { get; set; }
     public DbSet<DeliveryProof> DeliveryProof { get; set; }
@@ -24,22 +25,14 @@ public class DeliveryDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<DeliveryOrder>(entity =>
-        {
-            entity.HasKey(e => e.OrderId);
-            entity.Property(e => e.CustomerName).IsRequired().HasMaxLength(255);
-            entity.Property(e => e.CustomerPhone).IsRequired().HasMaxLength(50);
-            entity.Property(e => e.DeliveryAddress).IsRequired().HasMaxLength(500);
-            entity.Property(e => e.Status).HasMaxLength(50);
-        });
-
+        // Note: DeliveryOrder removed - orders are in OrderServiceDB only
+        
         modelBuilder.Entity<Delivery>(entity =>
         {
             entity.HasKey(e => e.DeliveryId);
-            entity.HasOne(e => e.Order)
-                  .WithMany()
-                  .HasForeignKey(e => e.OrderId)
-                  .OnDelete(DeleteBehavior.Cascade);
+            // Note: Orders are in OrderServiceDB, not DeliveryServiceDB
+            // Delivery references OrderId but cannot use foreign key across databases
+            // No navigation property configured - orders must be fetched separately from OrderServiceDB
         });
 
         modelBuilder.Entity<DeliveryStatusHistory>(entity =>

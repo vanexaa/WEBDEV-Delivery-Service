@@ -20,4 +20,6 @@ public interface IRiderService
     Task<List<RiderEarning>> GetRiderEarningsAsync(int riderId, DateTime? startDate = null, DateTime? endDate = null);
     Task<List<RiderFeedback>> GetRiderFeedbackAsync(int riderId);
     Task<RiderProfileDto?> GetRiderProfileAsync(int riderId);
+    Task<List<RiderOrderDto>> GetRiderDeliveryHistoryAsync(int riderId, DateTime? startDate = null, DateTime? endDate = null);
+    Task<List<RiderWithAvailabilityDto>> GetAllRidersWithAvailabilityAsync();
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../services/api';
+import { useAuth } from '../utils/AuthContext';
 import '../App.css';
 
 const LoginPage = () => {
@@ -9,6 +9,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,24 +17,35 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      const response = await authService.login(username, password);
+      console.log('[LoginPage] Attempting login for username:', username);
+      const result = await login(username, password);
       
-      // Store auth data
-      localStorage.setItem('authToken', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      
-      // Redirect based on role
-      const role = response.user.role;
-      if (role === 'Admin') {
-        navigate('/admin/dashboard');
-      } else if (role === 'Rider') {
-        navigate('/rider/dashboard');
-      } else if (role === 'Customer') {
-        navigate('/customer/track');
+      if (result.success) {
+        console.log('[LoginPage] Login successful, redirecting...');
+        
+        // Get user data from localStorage (set by AuthContext.login)
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const role = storedUser.role || storedUser.Role;
+        
+        console.log('[LoginPage] User role:', role);
+        console.log('[LoginPage] User data:', storedUser);
+        
+        // Redirect based on role
+        if (role === 'Admin' || role === 'admin') {
+          navigate('/admin/dashboard');
+        } else if (role === 'Rider' || role === 'rider') {
+          navigate('/rider/dashboard');
+        } else if (role === 'Customer' || role === 'customer') {
+          navigate('/customer/track');
+        } else {
+          console.error('[LoginPage] Unknown role:', role);
+          setError('Unknown role. Please contact administrator.');
+        }
       } else {
-        setError('Unknown role. Please contact administrator.');
+        setError(result.error || 'Login failed. Please check your credentials.');
       }
     } catch (err) {
+      console.error('[LoginPage] Login error:', err);
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);

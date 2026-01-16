@@ -26,30 +26,57 @@ const AdminDashboardPage = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
+      console.log('[AdminDashboard] Loading dashboard data...');
+      
+      // Use endpoints that include order/availability data
       const [activeDeliveries, allRiders] = await Promise.all([
-        deliveryService.getActiveDeliveries(),
-        riderService.getAllRiders()
+        deliveryService.getActiveDeliveriesWithOrders().catch(err => {
+          console.warn('[AdminDashboard] Failed to get deliveries with orders, falling back:', err);
+          return deliveryService.getActiveDeliveries();
+        }),
+        riderService.getAllRidersWithAvailability().catch(err => {
+          console.warn('[AdminDashboard] Failed to get riders with availability, falling back:', err);
+          return riderService.getAllRiders();
+        })
       ]);
       
-      const onlineRiders = allRiders.filter(r => r.isOnline).length;
+      console.log('[AdminDashboard] Loaded deliveries:', activeDeliveries?.length || 0);
+      console.log('[AdminDashboard] Loaded riders:', allRiders?.length || 0);
+      
+      // Handle both DTO format (with order) and regular format
+      const deliveries = activeDeliveries || [];
+      const riders = allRiders || [];
+      
+      // Check for online status - handle both camelCase and PascalCase
+      const onlineRiders = riders.filter(r => {
+        const isOnline = r.isOnline || r.IsOnline || false;
+        return isOnline;
+      }).length;
+      
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayDeliveries = activeDeliveries.filter(d => {
-        const assignedDate = new Date(d.assignedAt);
+      const todayDeliveries = deliveries.filter(d => {
+        const assignedAt = d.assignedAt || d.AssignedAt;
+        if (!assignedAt) return false;
+        const assignedDate = new Date(assignedAt);
         assignedDate.setHours(0, 0, 0, 0);
         return assignedDate.getTime() === today.getTime();
       }).length;
       
       setStats({
-        activeDeliveries: activeDeliveries.length,
-        pendingAssignments: activeDeliveries.filter(d => !d.riderId || d.status === 'Pending').length,
+        activeDeliveries: deliveries.length,
+        pendingAssignments: deliveries.filter(d => {
+          const riderId = d.riderId || d.RiderId;
+          const status = d.status || d.Status;
+          return !riderId || status === 'Pending';
+        }).length,
         onlineRiders: onlineRiders,
         todayDeliveries: todayDeliveries
       });
       
-      setDeliveries(activeDeliveries.slice(0, 10));
+      setDeliveries(deliveries.slice(0, 10));
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      console.error('[AdminDashboard] Error loading dashboard data:', error);
     } finally {
       setLoading(false);
     }
@@ -88,13 +115,27 @@ const AdminDashboardPage = () => {
     
     try {
       setAssigning(true);
-      await deliveryService.assignDelivery(selectedDelivery.orderId, riderId);
+      const orderId = selectedDelivery.orderId || selectedDelivery.OrderId;
+      console.log('[AdminDashboard] Assigning delivery:', orderId, 'to rider:', riderId);
+      
+      if (!orderId) {
+        alert('Invalid order ID. Cannot assign delivery.');
+        return;
+      }
+      
+      const result = await deliveryService.assignDelivery(orderId, riderId);
+      console.log('[AdminDashboard] Assignment result:', result);
+      
+      // Force refresh after a short delay
+      await new Promise(resolve => setTimeout(resolve, 500));
       await loadDashboardData();
+      
       setShowAssignModal(false);
       setSelectedDelivery(null);
+      alert('Delivery assigned successfully!');
     } catch (err) {
-      console.error('Error assigning delivery:', err);
-      alert('Failed to assign delivery. Please try again.');
+      console.error('[AdminDashboard] Error assigning delivery:', err);
+      alert(err.message || 'Failed to assign delivery. Please try again.');
     } finally {
       setAssigning(false);
     }
@@ -181,15 +222,21 @@ const AdminDashboardPage = () => {
                         </tr>
                       ) : (
                         deliveries.map((delivery) => {
-                          const order = delivery.order || {};
+                          // Handle both DTO format (order property) and regular format
+                          const order = delivery.order || delivery.Order || {};
+                          const orderId = delivery.orderId || delivery.OrderId;
+                          const riderId = delivery.riderId || delivery.RiderId;
+                          const status = delivery.status || delivery.Status;
+                          const assignedAt = delivery.assignedAt || delivery.AssignedAt;
+                          
                           return (
-                            <tr key={delivery.orderId}>
-                              <td>#{delivery.orderId}</td>
-                              <td>{order.customerName || 'N/A'}</td>
+                            <tr key={orderId}>
+                              <td>#{orderId}</td>
+                              <td>{order.customerName || order.CustomerName || 'N/A'}</td>
                               <td>
-                                <span className="badge bg-primary">{delivery.status}</span>
+                                <span className="badge bg-primary">{status}</span>
                               </td>
-                              <td>{new Date(delivery.assignedAt).toLocaleString()}</td>
+                              <td>{assignedAt ? new Date(assignedAt).toLocaleString() : 'N/A'}</td>
                               <td>
                                 <button 
                                   className="btn btn-sm btn-primary me-2"
@@ -197,7 +244,7 @@ const AdminDashboardPage = () => {
                                 >
                                   View
                                 </button>
-                                {!delivery.riderId && (
+                                {!riderId && (
                                   <button 
                                     className="btn btn-sm btn-success"
                                     onClick={() => handleAssignClick(delivery)}

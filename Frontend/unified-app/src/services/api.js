@@ -94,6 +94,10 @@ export const deliveryService = {
     return fetchApi(`${API_BASE_URL.delivery}/active`);
   },
   
+  getActiveDeliveriesWithOrders: async () => {
+    return fetchApi(`${API_BASE_URL.delivery}/active/with-orders`);
+  },
+  
   getDeliveryByOrderId: async (orderId) => {
     if (USE_MOCK_DATA && mockCustomerOrderService) {
       return mockCustomerOrderService.getDeliveryByOrderId(orderId);
@@ -143,6 +147,13 @@ export const riderService = {
     return fetchApi(API_BASE_URL.rider);
   },
   
+  getAllRidersWithAvailability: async () => {
+    if (USE_MOCK_DATA && mockAdminRiderService) {
+      return mockAdminRiderService.getAllRiders();
+    }
+    return fetchApi(`${API_BASE_URL.rider}/with-availability`);
+  },
+  
   getRiderById: async (riderId) => {
     if (USE_MOCK_DATA && mockAdminRiderService) {
       return mockAdminRiderService.getRiderById(riderId);
@@ -150,11 +161,25 @@ export const riderService = {
     return fetchApi(`${API_BASE_URL.rider}/${riderId}`);
   },
   
+  getRiderByUserId: async (userId) => {
+    return fetchApi(`${API_BASE_URL.rider}/byuser/${userId}`);
+  },
+  
   getRiderProfile: async (riderId) => {
     if (USE_MOCK_DATA && mockAdminRiderService) {
       return mockAdminRiderService.getRiderById(riderId);
     }
+    
+    // Validate riderId
+    if (!riderId || (typeof riderId === 'number' && riderId <= 0) || (typeof riderId === 'string' && parseInt(riderId, 10) <= 0)) {
+      throw new Error('Invalid rider ID. RiderId must be a positive number.');
+    }
+    
     return fetchApi(`${API_BASE_URL.rider}/${riderId}/profile`);
+  },
+  
+  getCurrentRiderProfile: async () => {
+    return fetchApi(`${API_BASE_URL.rider}/profile/me`);
   },
   
   getRiderAvailability: async (riderId) => {

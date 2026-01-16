@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
 
 const RiderNavbar = () => {
-  const { logout, user } = useAuth();
+  const { logout, user, riderProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -65,7 +65,9 @@ const RiderNavbar = () => {
           </ul>
           <ul className="navbar-nav">
             <li className="nav-item">
-              <span className="nav-link">Welcome, {user?.username}</span>
+              <span className="nav-link">
+                Welcome, {riderProfile?.fullName || riderProfile?.FullName || user?.username || 'Rider'}
+              </span>
             </li>
             <li className="nav-item">
               <button className="nav-link btn btn-link text-light" onClick={handleLogout}>

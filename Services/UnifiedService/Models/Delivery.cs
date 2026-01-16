@@ -21,6 +21,6 @@ public class Delivery
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    // Navigation property
-    public DeliveryOrder? Order { get; set; }
+    // Note: Orders are in OrderServiceDB, not DeliveryServiceDB
+    // Navigation property removed - orders must be fetched separately from OrderServiceDB
 }

@@ -10,47 +10,186 @@ const AvailabilityToggle = () => {
   useEffect(() => {
     // Load initial availability status from API
     const loadAvailability = async () => {
-      if (riderId) {
-        try {
-          const availability = await riderService.getRiderAvailability(riderId);
-          setIsOnline(availability?.isOnline || false);
-        } catch (error) {
-          console.error('Error loading availability:', error);
-          // Fallback to localStorage
-          const savedStatus = localStorage.getItem(`rider_${riderId}_online`);
+      // Try to get riderId from context or localStorage
+      let currentRiderId = riderId;
+      
+      if (!currentRiderId) {
+        // Try localStorage as fallback
+        const storedRiderId = localStorage.getItem('riderId');
+        if (storedRiderId) {
+          console.log('[AvailabilityToggle] Using riderId from localStorage:', storedRiderId);
+          currentRiderId = storedRiderId;
+        } else {
+          console.warn('[AvailabilityToggle] No riderId available yet, will retry...');
+          // Retry after a delay
+          const retryTimer = setTimeout(() => {
+            const retryRiderId = localStorage.getItem('riderId');
+            if (retryRiderId) {
+              loadAvailability();
+            }
+          }, 2000);
+          return () => clearTimeout(retryTimer);
+        }
+      }
+      
+      try {
+        // Ensure riderId is a number
+        const numericRiderId = typeof currentRiderId === 'string' ? parseInt(currentRiderId, 10) : currentRiderId;
+        if (isNaN(numericRiderId) || numericRiderId <= 0) {
+          console.error('[AvailabilityToggle] Invalid riderId:', currentRiderId);
+          return;
+        }
+        
+        console.log('[AvailabilityToggle] Loading availability for riderId:', numericRiderId);
+        
+        const availability = await riderService.getRiderAvailability(numericRiderId);
+        console.log('[AvailabilityToggle] Availability response:', availability);
+        
+        // Handle both camelCase and PascalCase
+        const isOnlineValue = availability?.isOnline !== undefined 
+          ? availability.isOnline 
+          : (availability?.IsOnline !== undefined ? availability.IsOnline : false);
+        
+        console.log('[AvailabilityToggle] Setting isOnline to:', isOnlineValue);
+        setIsOnline(isOnlineValue);
+        
+        // Save to localStorage as backup
+        localStorage.setItem(`rider_${numericRiderId}_online`, isOnlineValue.toString());
+      } catch (error) {
+        console.error('[AvailabilityToggle] Error loading availability:', error);
+        console.error('[AvailabilityToggle] Error details:', {
+          message: error.message,
+          stack: error.stack
+        });
+        
+        // Fallback to localStorage
+        const numericRiderId = typeof currentRiderId === 'string' ? parseInt(currentRiderId, 10) : currentRiderId;
+        if (!isNaN(numericRiderId) && numericRiderId > 0) {
+          const savedStatus = localStorage.getItem(`rider_${numericRiderId}_online`);
           if (savedStatus !== null) {
+            console.log('[AvailabilityToggle] Using saved availability status from localStorage:', savedStatus);
             setIsOnline(savedStatus === 'true');
+          } else {
+            console.log('[AvailabilityToggle] No saved availability status, defaulting to offline');
+            setIsOnline(false);
           }
         }
       }
     };
+    
     loadAvailability();
   }, [riderId]);
 
   const handleToggle = async () => {
-    if (!riderId) return;
+    // Get riderId from context or localStorage
+    let currentRiderId = riderId;
+    
+    if (!currentRiderId) {
+      // Try to get from localStorage
+      const storedRiderId = localStorage.getItem('riderId');
+      if (storedRiderId) {
+        console.log('[AvailabilityToggle] Using riderId from localStorage for toggle');
+        currentRiderId = storedRiderId;
+      } else {
+        console.error('[AvailabilityToggle] Cannot toggle availability: riderId is not set');
+        alert('Rider ID not found. Please log out and log in again.');
+        return;
+      }
+    }
+    
+    // Ensure riderId is a number
+    const numericRiderId = typeof currentRiderId === 'string' ? parseInt(currentRiderId, 10) : currentRiderId;
+    if (isNaN(numericRiderId) || numericRiderId <= 0) {
+      console.error('[AvailabilityToggle] Invalid riderId:', currentRiderId);
+      alert('Invalid rider ID. Please log out and log in again.');
+      return;
+    }
     
     try {
       setLoading(true);
       const newStatus = !isOnline;
+      console.log(`[AvailabilityToggle] === TOGGLE START ===`);
+      console.log(`[AvailabilityToggle] Current status: ${isOnline}`);
+      console.log(`[AvailabilityToggle] New status: ${newStatus}`);
+      console.log(`[AvailabilityToggle] RiderId: ${numericRiderId}`);
       
       // Update via API
-      await riderService.updateAvailability(riderId, newStatus);
+      console.log(`[AvailabilityToggle] Calling API: updateAvailability(${numericRiderId}, ${newStatus})`);
+      const result = await riderService.updateAvailability(numericRiderId, newStatus);
+      console.log('[AvailabilityToggle] Availability update response:', result);
       
-      // Update local state on success
+      // Optimistically update UI immediately
       setIsOnline(newStatus);
+      console.log('[AvailabilityToggle] UI updated optimistically to:', newStatus);
       
-      // Save to localStorage as backup
-      localStorage.setItem(`rider_${riderId}_online`, newStatus.toString());
+      // Force refresh from server after a short delay to ensure consistency
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Re-fetch from server to get actual state
+      try {
+        console.log('[AvailabilityToggle] Refreshing availability from server...');
+        const refreshed = await riderService.getRiderAvailability(numericRiderId);
+        console.log('[AvailabilityToggle] Refreshed availability:', refreshed);
+        
+        // Handle both camelCase and PascalCase
+        const actualStatus = refreshed?.isOnline !== undefined 
+          ? refreshed.isOnline 
+          : (refreshed?.IsOnline !== undefined ? refreshed.IsOnline : newStatus);
+        
+        setIsOnline(actualStatus);
+        
+        // Save to localStorage as backup
+        localStorage.setItem(`rider_${numericRiderId}_online`, actualStatus.toString());
+        
+        console.log(`[AvailabilityToggle] === TOGGLE SUCCESS ===`);
+        console.log(`[AvailabilityToggle] Final status: ${actualStatus ? 'Online' : 'Offline'}`);
+      } catch (refreshError) {
+        console.warn('[AvailabilityToggle] Could not refresh, using optimistic update:', refreshError);
+        console.warn('[AvailabilityToggle] Refresh error details:', {
+          message: refreshError.message,
+          stack: refreshError.stack
+        });
+        // Keep the optimistic update
+        localStorage.setItem(`rider_${numericRiderId}_online`, newStatus.toString());
+        console.log('[AvailabilityToggle] Using optimistic update status:', newStatus);
+      }
       
     } catch (error) {
-      console.error('Error updating availability:', error);
-      // Revert on error
-      setIsOnline(!isOnline);
+      console.error('[AvailabilityToggle] === TOGGLE ERROR ===');
+      console.error('[AvailabilityToggle] Error updating availability:', error);
+      console.error('[AvailabilityToggle] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      // Show user-friendly error
+      const errorMessage = error.message || 'Unknown error occurred';
+      alert(`Failed to update availability: ${errorMessage}`);
+      
+      // Revert on error - try to reload from server
+      try {
+        console.log('[AvailabilityToggle] Attempting to revert status...');
+        const currentAvailability = await riderService.getRiderAvailability(numericRiderId);
+        const currentStatus = currentAvailability?.isOnline !== undefined
+          ? currentAvailability.isOnline
+          : (currentAvailability?.IsOnline !== undefined ? currentAvailability.IsOnline : false);
+        setIsOnline(currentStatus);
+        console.log('[AvailabilityToggle] Status reverted to:', currentStatus);
+      } catch (revertError) {
+        // If we can't revert, keep current state
+        console.error('[AvailabilityToggle] Could not revert status:', revertError);
+        // Don't change the state if revert fails
+      }
     } finally {
       setLoading(false);
+      console.log('[AvailabilityToggle] Toggle operation completed');
     }
   };
+
+  // Get riderId for display purposes (from context or localStorage)
+  const displayRiderId = riderId || localStorage.getItem('riderId');
+  const isDisabled = loading || (!riderId && !localStorage.getItem('riderId'));
 
   return (
     <div className="card">
@@ -59,10 +198,17 @@ const AvailabilityToggle = () => {
           <div>
             <h6 className="mb-1">Availability Status</h6>
             <p className="text-muted mb-0 small">
-              {isOnline 
-                ? 'You are currently online and can receive orders' 
-                : 'You are offline and will not receive new orders'}
+              {loading 
+                ? 'Updating...' 
+                : (isOnline 
+                  ? 'You are currently online and can receive orders' 
+                  : 'You are offline and will not receive new orders')}
             </p>
+            {displayRiderId && (
+              <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
+                Rider ID: {displayRiderId}
+              </p>
+            )}
           </div>
           <div className="form-check form-switch">
             <input
@@ -72,12 +218,15 @@ const AvailabilityToggle = () => {
               id="availabilityToggle"
               checked={isOnline}
               onChange={handleToggle}
-              disabled={loading || !riderId}
-              style={{ width: '3rem', height: '1.5rem' }}
+              disabled={isDisabled}
+              title={isDisabled 
+                ? (loading ? 'Updating availability...' : 'Rider ID not loaded. Please refresh the page.') 
+                : 'Click to toggle online/offline status'}
+              style={{ width: '3rem', height: '1.5rem', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
             />
-            <label className="form-check-label ms-2" htmlFor="availabilityToggle">
+            <label className="form-check-label ms-2" htmlFor="availabilityToggle" style={{ cursor: isDisabled ? 'not-allowed' : 'pointer' }}>
               <span className={`badge ${isOnline ? 'bg-success' : 'bg-secondary'}`}>
-                {isOnline ? 'Online' : 'Offline'}
+                {loading ? '...' : (isOnline ? 'Online' : 'Offline')}
               </span>
             </label>
           </div>

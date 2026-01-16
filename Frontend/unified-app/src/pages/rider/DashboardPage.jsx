@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../utils/AuthContext';
-import { deliveryService } from '../../services/api';
+import { deliveryService, riderService } from '../../services/api';
 import RiderNavbar from '../../components/RiderNavbar';
 import AvailabilityToggle from '../../components/AvailabilityToggle';
 import '../../App.css';
@@ -14,13 +14,125 @@ const DashboardPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const { riderId, user } = useAuth();
   const navigate = useNavigate();
+  const refreshIntervalRef = useRef(null);
+  const isMountedRef = useRef(true);
+
+  // Memoize loadActiveOrders to prevent stale closures
+  const loadActiveOrders = useCallback(async () => {
+    if (!isMountedRef.current) return;
+    
+    try {
+      setLoading(true);
+      console.log('[DashboardPage] Loading orders for riderId:', riderId);
+      
+      if (!riderId) {
+        console.warn('[DashboardPage] RiderId not available, cannot load orders');
+        setOrders([]);
+        setError('');
+        return;
+      }
+
+      // Use the rider-specific orders endpoint if available
+      // Otherwise, fall back to filtering active deliveries
+      try {
+        const riderOrders = await riderService.getRiderOrders(riderId);
+        console.log('[DashboardPage] Rider orders response:', riderOrders);
+        
+        if (riderOrders && riderOrders.length > 0) {
+          // Map RiderOrderDto to the format expected by the UI
+          const mappedOrders = riderOrders.map(order => ({
+            transactionCode: `ORD-${order.orderId}`,
+            riderId: riderId,
+            status: order.status,
+            order: {
+              customerName: order.customerName,
+              deliveryAddress: order.deliveryAddress,
+              customerPhone: order.customerPhone
+            },
+            deliveryId: order.deliveryId,
+            orderId: order.orderId,
+            assignedAt: order.assignedAt
+          }));
+          
+          if (isMountedRef.current) {
+            setOrders(mappedOrders);
+            console.log('[DashboardPage] Orders updated:', mappedOrders.length);
+          }
+        } else {
+          // Fallback: get all active deliveries and filter by riderId
+          const deliveries = await deliveryService.getActiveDeliveries();
+          console.log('[DashboardPage] All deliveries:', deliveries);
+          console.log('[DashboardPage] Filtering by riderId:', riderId, 'Type:', typeof riderId);
+          
+          // Filter by riderId - handle both string and number comparison
+          const filteredDeliveries = deliveries.filter((d) => {
+            const dRiderId = d.riderId || d.RiderId;
+            return dRiderId != null && 
+                   (dRiderId === riderId || 
+                    parseInt(dRiderId) === parseInt(riderId) ||
+                    dRiderId.toString() === riderId.toString());
+          });
+          
+          console.log('[DashboardPage] Filtered orders for rider:', filteredDeliveries);
+          if (isMountedRef.current) {
+            setOrders(filteredDeliveries);
+          }
+        }
+      } catch (riderOrdersError) {
+        // Fallback to filtering active deliveries
+        console.warn('[DashboardPage] Rider orders endpoint failed, using fallback:', riderOrdersError);
+        const deliveries = await deliveryService.getActiveDeliveries();
+        console.log('[DashboardPage] All deliveries (fallback):', deliveries);
+        
+        // Filter by riderId - handle both string and number comparison
+        const filteredDeliveries = deliveries.filter((d) => {
+          const dRiderId = d.riderId || d.RiderId;
+          return dRiderId != null && 
+                 (dRiderId === riderId || 
+                  parseInt(dRiderId) === parseInt(riderId) ||
+                  dRiderId.toString() === riderId.toString());
+        });
+        
+        console.log('[DashboardPage] Filtered orders for rider (fallback):', filteredDeliveries);
+        if (isMountedRef.current) {
+          setOrders(filteredDeliveries);
+        }
+      }
+      
+      if (isMountedRef.current) {
+        setError('');
+      }
+    } catch (err) {
+      console.error('[DashboardPage] Error loading orders:', err);
+      if (isMountedRef.current) {
+        setError('Failed to load orders. Please try again.');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [riderId]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
+    // Initial load
     loadActiveOrders();
+    
     // Refresh orders every 30 seconds
-    const interval = setInterval(loadActiveOrders, 30000);
-    return () => clearInterval(interval);
-  }, [riderId, user]);
+    refreshIntervalRef.current = setInterval(() => {
+      console.log('[DashboardPage] Auto-refreshing orders...');
+      loadActiveOrders();
+    }, 30000);
+    
+    return () => {
+      isMountedRef.current = false;
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [loadActiveOrders]);
 
   useEffect(() => {
     // Apply search filter whenever orders or searchQuery changes
@@ -45,31 +157,20 @@ const DashboardPage = () => {
     }
   }, [orders, searchQuery]);
 
-  const loadActiveOrders = async () => {
-    try {
-      setLoading(true);
-      const deliveries = await deliveryService.getActiveDeliveries();
-      
-      // Filter by riderId if available, otherwise show all (or empty)
-      if (riderId) {
-        const riderOrders = deliveries.filter((d) => d.riderId === riderId);
-        setOrders(riderOrders);
-      } else {
-        // If riderId is not available, show empty or all orders
-        setOrders([]);
-      }
-      setError('');
-    } catch (err) {
-      setError('Failed to load orders. Please try again.');
-      console.error('Error loading orders:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleOrderClick = (transactionCode) => {
     navigate(`/rider/orders/${transactionCode}`);
   };
+
+  // Refresh orders when component becomes visible again (e.g., returning from order details)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('[DashboardPage] Window focused, refreshing orders...');
+      loadActiveOrders();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [loadActiveOrders]);
 
   return (
     <>

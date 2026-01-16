@@ -48,6 +48,15 @@ public class DeliveriesController : ControllerBase
 
         try
         {
+            _logger.LogInformation("AssignDelivery request received: OrderId={OrderId}, RiderId={RiderId}",
+                request.OrderId, request.RiderId);
+            
+            if (!request.RiderId.HasValue)
+            {
+                _logger.LogWarning("RiderId is required for assignment: OrderId={OrderId}", request.OrderId);
+                return BadRequest(new { message = "RiderId is required" });
+            }
+
             var delivery = await _deliveryService.AssignDeliveryAsync(request);
             if (delivery == null)
             {
@@ -57,7 +66,15 @@ public class DeliveriesController : ControllerBase
 
             _logger.LogInformation("Delivery assigned successfully: DeliveryId={DeliveryId}, OrderId={OrderId}, RiderId={RiderId}",
                 delivery.DeliveryId, delivery.OrderId, delivery.RiderId);
-            return Ok(delivery);
+            
+            // Return the delivery with confirmation
+            return Ok(new { 
+                deliveryId = delivery.DeliveryId,
+                orderId = delivery.OrderId,
+                riderId = delivery.RiderId,
+                status = delivery.Status,
+                message = "Delivery assigned successfully"
+            });
         }
         catch (Exception ex)
         {
@@ -103,6 +120,42 @@ public class DeliveriesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting active deliveries");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get active deliveries with order information (for Admin dashboard)
+    /// </summary>
+    [HttpGet("active/with-orders")]
+    public async Task<ActionResult> GetActiveDeliveriesWithOrders()
+    {
+        try
+        {
+            var deliveries = await _deliveryService.GetActiveDeliveriesWithOrdersAsync();
+            return Ok(deliveries);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting active deliveries with orders");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get available deliveries (unassigned or assigned to specific rider)
+    /// </summary>
+    [HttpGet("available")]
+    public async Task<ActionResult> GetAvailableDeliveries([FromQuery] int? riderId = null)
+    {
+        try
+        {
+            var deliveries = await _deliveryService.GetAvailableDeliveriesAsync(riderId);
+            return Ok(deliveries);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting available deliveries");
             return StatusCode(500, new { message = "An error occurred" });
         }
     }

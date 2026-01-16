@@ -20,21 +20,41 @@ const OrderDetailsPage = () => {
 
   useEffect(() => {
     loadOrderDetails();
-  }, [transactionCode]);
+  }, [transactionCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadOrderDetails = async () => {
     try {
       setLoading(true);
+      console.log('[OrderDetailsPage] Loading order details for:', transactionCode);
+      
+      // Extract orderId from transactionCode (format: "ORD-123" or just "123")
+      const orderId = transactionCode.startsWith('ORD-') 
+        ? parseInt(transactionCode.replace('ORD-', ''), 10)
+        : parseInt(transactionCode, 10);
+      
+      if (isNaN(orderId)) {
+        throw new Error('Invalid order ID format');
+      }
+      
+      console.log('[OrderDetailsPage] Extracted orderId:', orderId);
+      
       const [orderData, deliveryData] = await Promise.all([
-        orderService.getOrderById(transactionCode),
-        deliveryService.getDeliveryByOrderId(transactionCode).catch(() => null)
+        orderService.getOrderById(orderId),
+        deliveryService.getDeliveryByOrderId(orderId).catch((err) => {
+          console.warn('[OrderDetailsPage] Could not load delivery data:', err);
+          return null;
+        })
       ]);
+      
+      console.log('[OrderDetailsPage] Order data:', orderData);
+      console.log('[OrderDetailsPage] Delivery data:', deliveryData);
+      
       setOrder(orderData);
       setDelivery(deliveryData);
       setError('');
     } catch (err) {
+      console.error('[OrderDetailsPage] Error loading order:', err);
       setError(err.message || 'Failed to load order details');
-      console.error('Error loading order:', err);
     } finally {
       setLoading(false);
     }
@@ -45,6 +65,8 @@ const OrderDetailsPage = () => {
 
     setUpdatingStatus(true);
     try {
+      console.log('[OrderDetailsPage] Updating status to:', newStatus);
+      
       // Get current location for InTransit status
       let latitude = null;
       let longitude = null;
@@ -55,28 +77,52 @@ const OrderDetailsPage = () => {
               (position) => {
                 latitude = position.coords.latitude;
                 longitude = position.coords.longitude;
+                console.log('[OrderDetailsPage] Got location:', latitude, longitude);
                 resolve();
               },
-              () => resolve(),
+              () => {
+                console.warn('[OrderDetailsPage] Failed to get location');
+                resolve();
+              },
               { timeout: 5000 }
             );
           });
         }
       }
 
-      await deliveryService.updateDeliveryStatus(
-        transactionCode,
+      // Extract orderId from transactionCode
+      const orderId = transactionCode.startsWith('ORD-') 
+        ? parseInt(transactionCode.replace('ORD-', ''), 10)
+        : parseInt(transactionCode, 10);
+      
+      if (isNaN(orderId)) {
+        throw new Error('Invalid order ID format');
+      }
+      
+      const updateResult = await deliveryService.updateDeliveryStatus(
+        orderId,
         newStatus,
         statusNotes || null,
         latitude,
         longitude
       );
+      
+      console.log('[OrderDetailsPage] Status update result:', updateResult);
 
+      // Force refresh after a short delay to ensure backend has processed
+      await new Promise(resolve => setTimeout(resolve, 500));
       await loadOrderDetails();
       setStatusNotes('');
+      
+      console.log('[OrderDetailsPage] Order details refreshed after status update');
+      
+      // If status changed to Accepted, show success message
+      if (newStatus === 'Accepted') {
+        alert('Order accepted successfully!');
+      }
     } catch (err) {
+      console.error('[OrderDetailsPage] Error updating status:', err);
       alert(err.message || 'Failed to update status');
-      console.error('Error updating status:', err);
     } finally {
       setUpdatingStatus(false);
     }
@@ -84,12 +130,32 @@ const OrderDetailsPage = () => {
 
   const handleMarkDelivered = async () => {
     try {
-      await deliveryService.updateDeliveryStatus(transactionCode, 'Delivered', statusNotes);
+      setUpdatingStatus(true);
+      console.log('[OrderDetailsPage] Marking order as delivered');
+      
+      // Extract orderId from transactionCode
+      const orderId = transactionCode.startsWith('ORD-') 
+        ? parseInt(transactionCode.replace('ORD-', ''), 10)
+        : parseInt(transactionCode, 10);
+      
+      if (isNaN(orderId)) {
+        throw new Error('Invalid order ID format');
+      }
+      
+      await deliveryService.updateDeliveryStatus(orderId, 'Delivered', statusNotes);
+      
+      // Force refresh after a short delay
+      await new Promise(resolve => setTimeout(resolve, 500));
       await loadOrderDetails();
       setStatusNotes('');
+      
+      alert('Order marked as delivered successfully!');
       navigate('/rider/dashboard');
     } catch (err) {
+      console.error('[OrderDetailsPage] Error marking as delivered:', err);
       alert(err.message || 'Failed to mark as delivered');
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -100,7 +166,16 @@ const OrderDetailsPage = () => {
     }
 
     try {
-      await deliveryService.markDeliveryAsFailed(transactionCode, failureReason);
+      // Extract orderId from transactionCode
+      const orderId = transactionCode.startsWith('ORD-') 
+        ? parseInt(transactionCode.replace('ORD-', ''), 10)
+        : parseInt(transactionCode, 10);
+      
+      if (isNaN(orderId)) {
+        throw new Error('Invalid order ID format');
+      }
+      
+      await deliveryService.markDeliveryAsFailed(orderId, failureReason);
       setShowFailureModal(false);
       setFailureReason('');
       navigate('/rider/dashboard');

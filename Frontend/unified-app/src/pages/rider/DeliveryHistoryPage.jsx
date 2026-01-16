@@ -21,11 +21,13 @@ const DeliveryHistoryPage = () => {
     if (riderId) {
       loadHistory();
     }
-  }, [riderId, dateFilter]);
+  }, [riderId, dateFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadHistory = async () => {
     try {
       setLoading(true);
+      console.log('[DeliveryHistoryPage] Loading history for riderId:', riderId);
+      
       let start = null;
       let end = null;
 
@@ -59,11 +61,29 @@ const DeliveryHistoryPage = () => {
       }
 
       const historyData = await riderService.getRiderHistory(riderId, start, end);
-      setDeliveries(historyData || []);
+      console.log('[DeliveryHistoryPage] History data received:', historyData);
+      
+      // Map RiderOrderDto to expected format
+      const mappedDeliveries = (historyData || []).map(delivery => ({
+        deliveryId: delivery.deliveryId || delivery.DeliveryId,
+        orderId: delivery.orderId || delivery.OrderId,
+        transactionCode: `ORD-${delivery.orderId || delivery.OrderId}`,
+        status: delivery.status || delivery.Status,
+        assignedAt: delivery.assignedAt || delivery.AssignedAt,
+        order: {
+          customerName: delivery.customerName || delivery.CustomerName,
+          deliveryAddress: delivery.deliveryAddress || delivery.DeliveryAddress,
+          customerPhone: delivery.customerPhone || delivery.CustomerPhone,
+          paymentMethod: 'COD' // Default, could be enhanced
+        }
+      }));
+      
+      console.log('[DeliveryHistoryPage] Mapped deliveries:', mappedDeliveries);
+      setDeliveries(mappedDeliveries);
       setError('');
     } catch (err) {
+      console.error('[DeliveryHistoryPage] Error loading history:', err);
       setError(err.message || 'Failed to load delivery history');
-      console.error('Error loading history:', err);
     } finally {
       setLoading(false);
     }
@@ -99,7 +119,7 @@ const DeliveryHistoryPage = () => {
   };
 
   const handleOrderClick = (transactionCode) => {
-    navigate(`/orders/${transactionCode}`);
+    navigate(`/rider/orders/${transactionCode}`);
   };
 
   const getStatusBadgeClass = (status) => {
@@ -283,8 +303,8 @@ const DeliveryHistoryPage = () => {
                             : 'N/A'}
                         </td>
                         <td>
-                          {delivery.deliveredAt
-                            ? new Date(delivery.deliveredAt).toLocaleString()
+                          {delivery.status === 'Delivered' && delivery.assignedAt
+                            ? new Date(delivery.assignedAt).toLocaleString()
                             : '-'}
                         </td>
                         <td>

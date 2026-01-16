@@ -8,9 +8,12 @@
  */
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using RiderService.Models;
 using RiderService.Models.DTOs;
 using RiderService.Services;
+using System.Linq;
 
 namespace RiderService.Controllers;
 
@@ -51,6 +54,26 @@ public class RidersController : ControllerBase
     }
 
     /// <summary>
+    /// Get all riders with availability status (for Admin dashboard)
+    /// </summary>
+    [HttpGet("with-availability")]
+    public async Task<ActionResult> GetAllRidersWithAvailability()
+    {
+        try
+        {
+            _logger.LogInformation("GetAllRidersWithAvailability endpoint called");
+            var riders = await _riderService.GetAllRidersWithAvailabilityAsync();
+            _logger.LogInformation("Found {Count} riders with availability", riders?.Count ?? 0);
+            return Ok(riders ?? new List<RiderWithAvailabilityDto>());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all riders with availability: {Message}", ex.Message);
+            return StatusCode(500, new { message = "An error occurred", error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Get rider by ID
     /// </summary>
     [HttpGet("{riderId}")]
@@ -74,6 +97,29 @@ public class RidersController : ControllerBase
     }
 
     /// <summary>
+    /// Get rider by UserId (from AuthService)
+    /// </summary>
+    [HttpGet("byuser/{userId}")]
+    public async Task<ActionResult> GetRiderByUserId(int userId)
+    {
+        try
+        {
+            var rider = await _riderService.GetRiderByUserIdAsync(userId);
+            if (rider == null)
+            {
+                return NotFound(new { message = "Rider not found for this user" });
+            }
+
+            return Ok(rider);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting rider by userId");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
     /// Get rider profile with statistics
     /// </summary>
     [HttpGet("{riderId}/profile")]
@@ -81,18 +127,81 @@ public class RidersController : ControllerBase
     {
         try
         {
+            // Validate riderId parameter
+            if (riderId <= 0)
+            {
+                _logger.LogWarning("Invalid riderId provided: {RiderId}", riderId);
+                return BadRequest(new { message = "Invalid rider ID. RiderId must be greater than 0." });
+            }
+
+            _logger.LogInformation("GetRiderProfile called for RiderId={RiderId}", riderId);
+            
             var profile = await _riderService.GetRiderProfileAsync(riderId);
             if (profile == null)
             {
+                _logger.LogWarning("Rider profile not found for RiderId={RiderId}", riderId);
                 return NotFound(new { message = "Rider not found" });
             }
 
+            _logger.LogInformation("Rider profile retrieved successfully for RiderId={RiderId}", riderId);
             return Ok(profile);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting rider profile");
-            return StatusCode(500, new { message = "An error occurred" });
+            _logger.LogError(ex, "Error getting rider profile for RiderId={RiderId}", riderId);
+            return StatusCode(500, new { message = "An error occurred while retrieving rider profile", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get current rider profile from JWT token claims
+    /// </summary>
+    [HttpGet("profile/me")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<ActionResult> GetCurrentRiderProfile()
+    {
+        try
+        {
+            // Extract userId from JWT token - try multiple claim types
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                           ?? User.FindFirst("userId")?.Value
+                           ?? User.FindFirst("UserId")?.Value;
+            
+            _logger.LogInformation("GetCurrentRiderProfile called. Available claims: {Claims}", 
+                string.Join(", ", User.Claims.Select(c => $"{c.Type}={c.Value}")));
+            
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            {
+                _logger.LogWarning("Unable to extract userId from JWT token. Available claims: {Claims}", 
+                    string.Join(", ", User.Claims.Select(c => $"{c.Type}={c.Value}")));
+                return Unauthorized(new { message = "Unable to identify user from token" });
+            }
+
+            _logger.LogInformation("GetCurrentRiderProfile - extracted UserId={UserId}", userId);
+
+            // Get rider by userId
+            var rider = await _riderService.GetRiderByUserIdAsync(userId);
+            if (rider == null)
+            {
+                _logger.LogWarning("Rider not found for UserId={UserId}", userId);
+                return NotFound(new { message = "Rider not found for this user" });
+            }
+
+            // Get profile using riderId
+            var profile = await _riderService.GetRiderProfileAsync(rider.RiderId);
+            if (profile == null)
+            {
+                _logger.LogWarning("Rider profile not found for RiderId={RiderId}", rider.RiderId);
+                return NotFound(new { message = "Rider profile not found" });
+            }
+
+            _logger.LogInformation("Current rider profile retrieved successfully for RiderId={RiderId}", rider.RiderId);
+            return Ok(profile);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting current rider profile");
+            return StatusCode(500, new { message = "An error occurred while retrieving rider profile", error = ex.Message });
         }
     }
 
@@ -122,18 +231,44 @@ public class RidersController : ControllerBase
     {
         try
         {
+            // Validate riderId parameter
+            if (riderId <= 0)
+            {
+                _logger.LogWarning("Invalid riderId provided: {RiderId}", riderId);
+                return BadRequest(new { message = "Invalid rider ID. RiderId must be greater than 0." });
+            }
+
+            _logger.LogInformation("GetRiderAvailability called for RiderId={RiderId}", riderId);
+            
             var availability = await _riderService.GetRiderAvailabilityAsync(riderId);
             if (availability == null)
             {
-                return NotFound(new { message = "Availability not found" });
+                // Return default offline status if availability record doesn't exist
+                _logger.LogInformation("No availability record found for RiderId={RiderId}, returning default offline status", riderId);
+                return Ok(new { 
+                    riderId = riderId,
+                    isOnline = false,
+                    lastSeen = DateTime.UtcNow,
+                    message = "Availability record not found, defaulting to offline"
+                });
             }
 
-            return Ok(availability);
+            _logger.LogInformation("Rider availability retrieved: RiderId={RiderId}, IsOnline={IsOnline}", 
+                riderId, availability.IsOnline);
+            
+            return Ok(new {
+                riderId = availability.RiderId,
+                isOnline = availability.IsOnline,
+                currentLatitude = availability.CurrentLatitude,
+                currentLongitude = availability.CurrentLongitude,
+                lastSeen = availability.LastSeen,
+                updatedAt = availability.UpdatedAt
+            });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting rider availability");
-            return StatusCode(500, new { message = "An error occurred" });
+            _logger.LogError(ex, "Error getting rider availability for RiderId={RiderId}", riderId);
+            return StatusCode(500, new { message = "An error occurred while retrieving availability", error = ex.Message });
         }
     }
 
@@ -144,11 +279,12 @@ public class RidersController : ControllerBase
     public async Task<ActionResult> UpdateRiderAvailability(int riderId, [FromBody] UpdateAvailabilityRequest request)
     {
         _logger.LogInformation("UpdateRiderAvailability called: RiderId={RiderId}, Request={@Request}", riderId, request);
-        
+
+        // Validate riderId parameter
         if (riderId <= 0)
         {
             _logger.LogWarning("Invalid rider ID: {RiderId}", riderId);
-            return BadRequest(new { message = "Invalid rider ID" });
+            return BadRequest(new { message = "Invalid rider ID. RiderId must be greater than 0." });
         }
 
         if (request == null)
@@ -159,28 +295,61 @@ public class RidersController : ControllerBase
 
         try
         {
+            // Verify rider exists before updating
+            var rider = await _riderService.GetRiderByIdAsync(riderId);
+            if (rider == null)
+            {
+                _logger.LogWarning("Rider not found for RiderId={RiderId}", riderId);
+                return NotFound(new { message = "Rider not found" });
+            }
+
             var availability = await _riderService.UpdateRiderAvailabilityAsync(riderId, request);
             if (availability == null)
             {
+                _logger.LogError("UpdateRiderAvailabilityAsync returned null for RiderId={RiderId}", riderId);
                 return StatusCode(500, new { message = "Failed to update availability" });
             }
 
-            _logger.LogInformation("Rider availability updated: RiderId={RiderId}, IsOnline={IsOnline}",
-                riderId, request.IsOnline);
-            return Ok(availability);
+            _logger.LogInformation("Rider availability updated successfully: RiderId={RiderId}, IsOnline={IsOnline}",
+                riderId, availability.IsOnline);
+            
+            // Return updated availability with success message
+            return Ok(new { 
+                isOnline = availability.IsOnline,
+                lastSeen = availability.LastSeen,
+                message = $"Rider is now {(availability.IsOnline ? "online" : "offline")}"
+            });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating rider availability for RiderId={RiderId}", riderId);
+            return StatusCode(500, new { message = "An error occurred while updating availability", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get rider delivery history (deliveries with order details)
+    /// </summary>
+    [HttpGet("{riderId}/history")]
+    public async Task<ActionResult> GetRiderHistory(int riderId, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+    {
+        try
+        {
+            var deliveryHistory = await _riderService.GetRiderDeliveryHistoryAsync(riderId, startDate, endDate);
+            return Ok(deliveryHistory);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting rider history");
             return StatusCode(500, new { message = "An error occurred" });
         }
     }
 
     /// <summary>
-    /// Get rider delivery history
+    /// Get rider earnings history
     /// </summary>
-    [HttpGet("{riderId}/history")]
-    public async Task<ActionResult> GetRiderHistory(int riderId, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+    [HttpGet("{riderId}/earnings")]
+    public async Task<ActionResult> GetRiderEarnings(int riderId, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
     {
         try
         {
@@ -189,7 +358,7 @@ public class RidersController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting rider history");
+            _logger.LogError(ex, "Error getting rider earnings");
             return StatusCode(500, new { message = "An error occurred" });
         }
     }

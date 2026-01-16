@@ -23,33 +23,57 @@ const TrackOrderPage = () => {
 
     setLoading(true);
     setError('');
+    
     try {
-      // Fetch order details
-      const orderData = await orderService.getOrderById(orderId);
-      setOrder(orderData);
+      console.log('[TrackOrderPage] Fetching tracking info for orderId:', orderId);
+      
+      // Fetch order details and tracking information in parallel
+      const [orderData, trackingData] = await Promise.all([
+        orderService.getOrderById(orderId).catch(err => {
+          console.error('[TrackOrderPage] Error fetching order:', err);
+          throw new Error('Order not found');
+        }),
+        deliveryService.getDeliveryTracking(orderId).catch(err => {
+          console.warn('[TrackOrderPage] Could not fetch tracking:', err);
+          return null;
+        })
+      ]);
 
-      // Fetch tracking information
-      const trackingData = await deliveryService.getDeliveryTracking(orderId);
+      console.log('[TrackOrderPage] Order data:', orderData);
+      console.log('[TrackOrderPage] Tracking data:', trackingData);
+
+      setOrder(orderData);
       setTracking(trackingData);
 
       // Fetch rider info if delivery is assigned
-      if (trackingData?.riderId) {
+      const riderId = trackingData?.riderId || trackingData?.RiderId;
+      console.log('[TrackOrderPage] RiderId from tracking:', riderId);
+      
+      if (riderId) {
         try {
           const rider = await customerService.getRiderInfo(orderId);
+          console.log('[TrackOrderPage] Rider info received:', rider);
           setRiderInfo(rider);
         } catch (err) {
-          console.error('Error fetching rider info:', err);
+          console.error('[TrackOrderPage] Error fetching rider info:', err);
+          setRiderInfo(null);
         }
+      } else {
+        console.warn('[TrackOrderPage] No riderId found in tracking data');
+        setRiderInfo(null);
       }
 
       // Fetch ETA
       try {
         const etaData = await customerService.getETA(orderId);
+        console.log('[TrackOrderPage] ETA data:', etaData);
         setEta(etaData);
       } catch (err) {
-        console.error('Error fetching ETA:', err);
+        console.error('[TrackOrderPage] Error fetching ETA:', err);
+        setEta(null);
       }
     } catch (err) {
+      console.error('[TrackOrderPage] Error loading tracking:', err);
       setError(err.message || 'Failed to load tracking information');
       setTracking(null);
       setOrder(null);
@@ -179,7 +203,13 @@ const TrackOrderPage = () => {
 
             <div style={{ padding: '24px' }}>
               {/* Driver Information */}
-              <RiderInfoCard riderInfo={riderInfo} />
+              {riderInfo ? (
+                <RiderInfoCard riderInfo={riderInfo} />
+              ) : tracking?.riderId || tracking?.RiderId ? (
+                <div style={{ marginBottom: '24px', marginTop: '10px', color: '#666' }}>
+                  <p>Loading rider information...</p>
+                </div>
+              ) : null}
 
               {/* Map Container */}
               <div style={{
