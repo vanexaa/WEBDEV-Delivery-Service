@@ -119,4 +119,32 @@ public class OrdersController : ControllerBase
             return StatusCode(500, new { message = "An error occurred while getting the order" });
         }
     }
+
+    /// <summary>
+    /// Get pending assignments - orders waiting for rider assignment.
+    /// This is the single source of truth for the Admin dashboard "Pending Assignments" section.
+    /// 
+    /// Returns orders where:
+    /// - Order.Status = 'Pending'
+    /// - AND (no delivery record exists OR delivery has no rider OR delivery status is "Pending")
+    /// </summary>
+    [HttpGet("pending-assignments")]
+    public async Task<ActionResult> GetPendingAssignments()
+    {
+        try
+        {
+            _logger.LogInformation("[API] GET /api/orders/pending-assignments called");
+            
+            var pendingAssignments = await _orderService.GetPendingAssignmentsAsync();
+            
+            _logger.LogInformation("[API] Returning {Count} pending assignments", pendingAssignments.Count);
+            
+            return Ok(pendingAssignments);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting pending assignments");
+            return StatusCode(500, new { message = "An error occurred while getting pending assignments" });
+        }
+    }
 }

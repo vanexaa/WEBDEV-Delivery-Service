@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
+import safeStorage from '../utils/storage';
 import '../App.css';
 
 const LoginPage = () => {
@@ -24,7 +25,7 @@ const LoginPage = () => {
         console.log('[LoginPage] Login successful, redirecting...');
         
         // Get user data from localStorage (set by AuthContext.login)
-        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const storedUser = JSON.parse(safeStorage.getItem('user') || '{}');
         const role = storedUser.role || storedUser.Role;
         
         console.log('[LoginPage] User role:', role);

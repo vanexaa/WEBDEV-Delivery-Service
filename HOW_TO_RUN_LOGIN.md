@@ -5,9 +5,9 @@
 Open a terminal/PowerShell and run:
 
 ```bash
-cd "Services\UnifiedService"
+  
 dotnet run
-```
+```  
 
 The service will start on `http://localhost:5000`
 

@@ -7,6 +7,7 @@
  * All authentication endpoints are accessible at: http://localhost:5000/api/auth/*
  */
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using AuthService.Models;
@@ -43,6 +44,7 @@ public class AuthController : ControllerBase
     /// Authenticate user and receive JWT token
     /// </summary>
     [HttpPost("login")]
+    [AllowAnonymous]
     public async Task<ActionResult> Login([FromBody] LoginRequest request)
     {
         if (request == null)
@@ -50,6 +52,8 @@ public class AuthController : ControllerBase
             _logger.LogWarning("Login called with null request");
             return BadRequest(new { message = "Request body is required" });
         }
+
+        _logger.LogInformation("Login request received for username/email: {Username}", request.Username);
 
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
         {
@@ -97,6 +101,18 @@ public class AuthController : ControllerBase
             // Log token generation for debugging
             _logger.LogDebug("Generated token for UserId={UserId}, Role={Role}, RiderId={RiderId}", 
                 response.User.UserId, response.User.Role, response.User.RiderId);
+
+            var origin = Request.Headers["Origin"].FirstOrDefault();
+            var isCrossSite = !string.IsNullOrWhiteSpace(origin) &&
+                              !origin.Contains(Request.Host.Host, StringComparison.OrdinalIgnoreCase);
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = Request.IsHttps || isCrossSite,
+                SameSite = isCrossSite ? SameSiteMode.None : SameSiteMode.Lax,
+                Expires = response.ExpiresAt
+            };
+            Response.Cookies.Append("authToken", response.Token, cookieOptions);
             
             return Ok(response);
         }
@@ -198,7 +214,7 @@ public class AuthController : ControllerBase
         var authHeader = Request.Headers["Authorization"].FirstOrDefault();
         if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
-            return null;
+            return Request.Cookies.TryGetValue("authToken", out var cookieToken) ? cookieToken : null;
         }
 
         return authHeader.Substring("Bearer ".Length).Trim();

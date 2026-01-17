@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../utils/AuthContext';
 import { riderService } from '../../services/api';
 import RiderNavbar from '../../components/RiderNavbar';
+import safeStorage from '../../utils/storage';
 import '../../App.css';
 
 const RiderDetailsPage = () => {
@@ -11,7 +12,7 @@ const RiderDetailsPage = () => {
   
   // Get riderId from multiple sources
   const riderId = contextRiderId || contextRiderProfile?.riderId || user?.riderId || user?.RiderId || 
-                  (typeof window !== 'undefined' ? parseInt(localStorage.getItem('riderId') || '0', 10) : null);
+                  parseInt(safeStorage.getItem('riderId') || '0', 10);
   
   const [riderProfile, setRiderProfile] = useState(null);
   const [riderAvailability, setRiderAvailability] = useState(null);

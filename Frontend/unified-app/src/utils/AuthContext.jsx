@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService, riderService } from '../services/api';
+import safeStorage from './storage';
 
 const AuthContext = createContext(null);
 
@@ -12,8 +13,8 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Check for stored auth data
-    const storedToken = localStorage.getItem('authToken');
-    const storedUser = localStorage.getItem('user');
+    const storedToken = safeStorage.getItem('authToken');
+    const storedUser = safeStorage.getItem('user');
 
     if (storedToken && storedUser) {
       try {
@@ -47,7 +48,7 @@ export const AuthProvider = ({ children }) => {
           if (!isNaN(numericRiderId) && numericRiderId > 0) {
             console.log('[AuthContext] Restored riderId from storage:', numericRiderId);
             setRiderId(numericRiderId);
-            localStorage.setItem('riderId', numericRiderId.toString());
+            safeStorage.setItem('riderId', numericRiderId.toString());
           }
         }
         
@@ -107,8 +108,8 @@ export const AuthProvider = ({ children }) => {
           });
       } catch (error) {
         console.error('[AuthContext] Error parsing stored user data:', error);
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
+        safeStorage.removeItem('authToken');
+        safeStorage.removeItem('user');
         setLoading(false);
       }
     } else {
@@ -130,7 +131,7 @@ export const AuthProvider = ({ children }) => {
         console.log('[AuthContext] Rider profile loaded successfully - riderId:', id, 'profile:', rider);
         
         // Store riderId in localStorage for quick access
-        localStorage.setItem('riderId', id.toString());
+        safeStorage.setItem('riderId', id.toString());
       } else {
         console.warn('[AuthContext] No rider found for userId:', userId);
         setLoading(false);
@@ -150,7 +151,7 @@ export const AuthProvider = ({ children }) => {
           const id = rider.riderId || rider.RiderId;
           setRiderId(id);
           setRiderProfile(rider);
-          localStorage.setItem('riderId', id.toString());
+          safeStorage.setItem('riderId', id.toString());
           console.log('[AuthContext] Rider profile loaded via fallback - riderId:', id);
         } else {
           console.warn('[AuthContext] Rider not found in fallback search for userId:', userId);
@@ -196,8 +197,8 @@ export const AuthProvider = ({ children }) => {
       
       setToken(response.token);
       setUser(normalizedUser);
-      localStorage.setItem('authToken', response.token);
-      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      safeStorage.setItem('authToken', response.token);
+      safeStorage.setItem('user', JSON.stringify(normalizedUser));
       
       console.log('[AuthContext] Token and user data stored in localStorage');
       
@@ -207,7 +208,7 @@ export const AuthProvider = ({ children }) => {
           // RiderId was included in login response
           console.log('[AuthContext] RiderId from login response:', riderIdFromResponse);
           setRiderId(riderIdFromResponse);
-          localStorage.setItem('riderId', riderIdFromResponse.toString());
+          safeStorage.setItem('riderId', riderIdFromResponse.toString());
           
           // Fetch full rider profile
           try {
@@ -249,9 +250,9 @@ export const AuthProvider = ({ children }) => {
     setRiderId(null);
     setRiderProfile(null);
     setToken(null);
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    localStorage.removeItem('riderId');
+    safeStorage.removeItem('authToken');
+    safeStorage.removeItem('user');
+    safeStorage.removeItem('riderId');
   };
 
   const value = {

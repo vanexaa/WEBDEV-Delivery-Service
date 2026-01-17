@@ -155,6 +155,16 @@ public class DeliveryService : IDeliveryService
                     
                     await _context.SaveChangesAsync();
                     
+                    // Update Order status in OrderServiceDB to reflect assignment
+                    if (order != null && order.Status == "Pending")
+                    {
+                        order.Status = "Assigned";
+                        order.UpdatedAt = DateTime.UtcNow;
+                        await _orderContext.SaveChangesAsync();
+                        _logger.LogInformation("Order status updated to 'Assigned': OrderId={OrderId}, UpdatedAt={UpdatedAt}", 
+                            order.OrderId, order.UpdatedAt);
+                    }
+                    
                     _logger.LogInformation("Existing delivery updated with RiderId: DeliveryId={DeliveryId}, OrderId={OrderId}, RiderId={RiderId}",
                         existingDelivery.DeliveryId, existingDelivery.OrderId, existingDelivery.RiderId);
                 }
@@ -205,6 +215,16 @@ public class DeliveryService : IDeliveryService
 
             _logger.LogInformation("Delivery assigned successfully: DeliveryId={DeliveryId}, OrderId={OrderId}, RiderId={RiderId}",
                 delivery.DeliveryId, delivery.OrderId, delivery.RiderId);
+
+            // Update Order status in OrderServiceDB to reflect assignment
+            if (order != null && order.Status == "Pending")
+            {
+                order.Status = "Assigned";
+                order.UpdatedAt = DateTime.UtcNow;
+                await _orderContext.SaveChangesAsync();
+                _logger.LogInformation("Order status updated to 'Assigned': OrderId={OrderId}, UpdatedAt={UpdatedAt}", 
+                    order.OrderId, order.UpdatedAt);
+            }
 
             // Verify the assignment was saved correctly
             var savedDelivery = await _context.Deliveries.FindAsync(delivery.DeliveryId);
@@ -398,6 +418,31 @@ public class DeliveryService : IDeliveryService
 
             await _context.SaveChangesAsync();
 
+            // Sync Order status in OrderServiceDB (database is single source of truth)
+            var order = await _orderContext.Orders.FindAsync(delivery.OrderId);
+            if (order != null)
+            {
+                // Map delivery status to order status
+                var orderStatus = request.Status switch
+                {
+                    "Accepted" => "Accepted",
+                    "PickedUp" => "PickedUp",
+                    "InTransit" => "InTransit",
+                    "Delivered" => "Delivered",
+                    "Failed" => "Cancelled",
+                    _ => order.Status
+                };
+                
+                if (order.Status != orderStatus)
+                {
+                    order.Status = orderStatus;
+                    order.UpdatedAt = DateTime.UtcNow;
+                    await _orderContext.SaveChangesAsync();
+                    _logger.LogInformation("Order status synced: OrderId={OrderId}, NewStatus={Status}", 
+                        order.OrderId, orderStatus);
+                }
+            }
+
             _logger.LogInformation("Delivery status updated: DeliveryId={DeliveryId}, PreviousStatus={PreviousStatus}, NewStatus={NewStatus}",
                 deliveryId, previousStatus, request.Status);
 
@@ -433,6 +478,16 @@ public class DeliveryService : IDeliveryService
         });
 
         await _context.SaveChangesAsync();
+
+        // Sync Order status to "Cancelled" (database is single source of truth)
+        var order = await _orderContext.Orders.FindAsync(delivery.OrderId);
+        if (order != null)
+        {
+            order.Status = "Cancelled";
+            order.UpdatedAt = DateTime.UtcNow;
+            await _orderContext.SaveChangesAsync();
+            _logger.LogInformation("Order {OrderId} status synced to 'Cancelled' due to failed delivery", order.OrderId);
+        }
 
         return delivery;
     }
@@ -576,17 +631,18 @@ public class DeliveryService : IDeliveryService
 
             await _context.SaveChangesAsync();
 
-            // Update Order status to "In Progress"
+            // Sync Order status to "Accepted" (database is single source of truth)
             var order = await _orderContext.Orders.FindAsync(delivery.OrderId);
             if (order != null)
             {
-                order.Status = "In Progress";
+                order.Status = "Accepted";
+                order.UpdatedAt = DateTime.UtcNow;
                 await _orderContext.SaveChangesAsync();
-                _logger.LogInformation("Order {OrderId} status updated to 'In Progress'", order.OrderId);
+                _logger.LogInformation("Order {OrderId} status synced to 'Accepted'", order.OrderId);
             }
             else
             {
-                _logger.LogWarning("Order {OrderId} not found when updating status", delivery.OrderId);
+                _logger.LogWarning("Order {OrderId} not found when syncing status", delivery.OrderId);
             }
 
             _logger.LogInformation("Delivery {DeliveryId} accepted by rider {RiderId}", deliveryId, riderId);
@@ -654,6 +710,16 @@ public class DeliveryService : IDeliveryService
             });
 
             await _context.SaveChangesAsync();
+
+            // Sync Order status back to "Pending" for reassignment (database is single source of truth)
+            var order = await _orderContext.Orders.FindAsync(delivery.OrderId);
+            if (order != null)
+            {
+                order.Status = "Pending";
+                order.UpdatedAt = DateTime.UtcNow;
+                await _orderContext.SaveChangesAsync();
+                _logger.LogInformation("Order {OrderId} status synced back to 'Pending' for reassignment", order.OrderId);
+            }
 
             // Try to auto-assign to another available rider
             try

@@ -4,6 +4,7 @@ import { useAuth } from '../../utils/AuthContext';
 import { deliveryService, riderService, orderService } from '../../services/api';
 import RiderNavbar from '../../components/RiderNavbar';
 import AvailabilityToggle from '../../components/AvailabilityToggle';
+import safeStorage from '../../utils/storage';
 import '../../App.css';
 
 const DashboardPage = () => {
@@ -17,7 +18,7 @@ const DashboardPage = () => {
   const { user, riderProfile, riderId: contextRiderId } = useAuth();
   // Try multiple sources for riderId in priority order
   const riderId = contextRiderId || riderProfile?.riderId || user?.riderId || user?.RiderId || 
-                  (typeof window !== 'undefined' ? parseInt(localStorage.getItem('riderId') || '0', 10) : null);
+                  parseInt(safeStorage.getItem('riderId') || '0', 10);
   const navigate = useNavigate();
   const refreshIntervalRef = useRef(null);
   const isMountedRef = useRef(true);
@@ -36,7 +37,7 @@ const DashboardPage = () => {
           contextRiderId,
           riderProfileRiderId: riderProfile?.riderId,
           userRiderId: user?.riderId,
-          localStorageRiderId: typeof window !== 'undefined' ? localStorage.getItem('riderId') : null
+          localStorageRiderId: safeStorage.getItem('riderId')
         });
         setOrders([]);
         setError(errorMsg);
@@ -212,7 +213,7 @@ const DashboardPage = () => {
       contextRiderId,
       riderProfileRiderId: riderProfile?.riderId,
       userRiderId: user?.riderId,
-      localStorageRiderId: typeof window !== 'undefined' ? localStorage.getItem('riderId') : null
+      localStorageRiderId: safeStorage.getItem('riderId')
     });
   }, [riderId, contextRiderId, riderProfile?.riderId, user?.riderId]);
 

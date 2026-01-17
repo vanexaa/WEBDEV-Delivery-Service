@@ -34,8 +34,20 @@ public class AuthService : IAuthService
     {
         try
         {
+            var identifier = request.Username?.Trim();
+            if (string.IsNullOrWhiteSpace(identifier))
+            {
+                _logger.LogWarning("Login attempt with empty username/email identifier");
+                return null;
+            }
+
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == request.Username && u.IsActive);
+                .FirstOrDefaultAsync(u =>
+                    u.Username == identifier || u.Email == identifier);
+
+            _logger.LogInformation("Login lookup for {Identifier}: user {UserStatus}",
+                identifier,
+                user == null ? "NOT FOUND" : "FOUND");
 
             if (user == null)
             {
@@ -43,8 +55,19 @@ public class AuthService : IAuthService
                 return null;
             }
 
+            if (!user.IsActive)
+            {
+                _logger.LogWarning("Login attempt for inactive user: {Username}", user.Username);
+                return null;
+            }
+
             // Verify password using BCrypt
-            if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            _logger.LogInformation("Password verification for {Identifier}: {PasswordStatus}",
+                identifier,
+                passwordValid ? "PASSED" : "FAILED");
+
+            if (!passwordValid)
             {
                 _logger.LogWarning("Login attempt with invalid password for user: {Username}", request.Username);
                 return null;

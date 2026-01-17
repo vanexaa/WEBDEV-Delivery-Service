@@ -127,10 +127,11 @@ builder.Services.AddScoped<IRiderService, RiderService.Services.RiderService>();
 builder.Services.AddScoped<IOrderService>(sp =>
 {
     var orderContext = sp.GetRequiredService<OrderDbContext>();
+    var deliveryContext = sp.GetRequiredService<DeliveryDbContext>();
     var deliveryService = sp.GetRequiredService<IDeliveryService>();
     var riderContext = sp.GetRequiredService<RiderDbContext>();
     var logger = sp.GetRequiredService<ILogger<OrderService.Services.OrderService>>();
-    return new OrderService.Services.OrderService(orderContext, deliveryService, riderContext, logger);
+    return new OrderService.Services.OrderService(orderContext, deliveryContext, deliveryService, riderContext, logger);
 });
 
 builder.Services.AddScoped<ICustomerService, CustomerService.Services.CustomerService>(sp =>
@@ -183,11 +184,18 @@ builder.Services.AddSwaggerGen(c =>
 // CORS Configuration
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://localhost:4173",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:4173")
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
@@ -317,7 +325,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAll");
+app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

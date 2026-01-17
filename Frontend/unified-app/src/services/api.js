@@ -12,10 +12,12 @@
  * All endpoints: http://localhost:5000/api/*
  */
 
+import safeStorage from '../utils/storage';
+
 // Enable mock data mode by setting this to true
-// Or set USE_MOCK_DATA=true in localStorage
+// Or set USE_MOCK_DATA=true in storage
 // Default to false for production
-const USE_MOCK_DATA = localStorage.getItem('USE_MOCK_DATA') === 'true';
+const USE_MOCK_DATA = safeStorage.getItem('USE_MOCK_DATA') === 'true';
 
 // Import mock services if available
 let mockRiderHistoryService, mockCustomerOrderService, mockAdminRiderService;
@@ -29,15 +31,15 @@ try {
 }
 
 const API_BASE_URL = {
-  auth: 'http://localhost:5000/api/auth',
-  delivery: 'http://localhost:5000/api/deliveries',
-  rider: 'http://localhost:5000/api/riders',
-  order: 'http://localhost:5000/api/orders',
-  customer: 'http://localhost:5000/api/customers'
+  auth: '/api/auth',
+  delivery: '/api/deliveries',
+  rider: '/api/riders',
+  order: '/api/orders',
+  customer: '/api/customers'
 };
 
 const fetchApi = async (url, options = {}) => {
-  const token = localStorage.getItem('authToken');
+  const token = safeStorage.getItem('authToken');
   const headers = {
     'Content-Type': 'application/json',
     ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -47,7 +49,8 @@ const fetchApi = async (url, options = {}) => {
   try {
     const response = await fetch(url, {
       ...options,
-      headers
+      headers,
+      credentials: 'include'
     });
     
     if (!response.ok) {
@@ -73,9 +76,11 @@ const fetchApi = async (url, options = {}) => {
 // Auth Service
 export const authService = {
   login: async (username, password) => {
+    const normalizedUsername = typeof username === 'string' ? username.trim() : username;
+    const normalizedPassword = typeof password === 'string' ? password : password;
     return fetchApi(`${API_BASE_URL.auth}/login`, {
       method: 'POST',
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username: normalizedUsername, password: normalizedPassword })
     });
   },
   
@@ -304,7 +309,6 @@ export const customerService = {
 };
 
 // Order Service
-// Order Service
 export const orderService = {
   getAllOrders: async () => {
     return fetchApi(`${API_BASE_URL.order}`);
@@ -327,5 +331,17 @@ export const orderService = {
       method: 'POST',
       body: JSON.stringify(orderData)
     });
+  },
+
+  /**
+   * Get pending assignments - orders waiting for rider assignment.
+   * This is the single source of truth for the Admin dashboard "Pending Assignments" section.
+   * Data comes directly from SQL, not filtered locally.
+   */
+  getPendingAssignments: async () => {
+    console.log('[orderService] Fetching pending assignments from API (SQL source of truth)');
+    const result = await fetchApi(`${API_BASE_URL.order}/pending-assignments`);
+    console.log('[orderService] Pending assignments response:', result?.length || 0, 'items');
+    return result;
   }
 };

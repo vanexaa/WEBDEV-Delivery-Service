@@ -15,4 +15,10 @@ public interface IOrderService
     Task<List<Order>> GetAllOrdersAsync();
     Task<List<Order>> GetOrdersByCustomerIdAsync(int customerId);
     Task<Order?> GetOrderByIdAsync(int orderId);
+    
+    /// <summary>
+    /// Gets orders that are pending assignment (Status = 'Pending' and no active delivery assignment).
+    /// This is the single source of truth for the Admin dashboard "Pending Assignments" section.
+    /// </summary>
+    Task<List<PendingAssignmentDto>> GetPendingAssignmentsAsync();
 }
