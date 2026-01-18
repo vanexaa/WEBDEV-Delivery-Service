@@ -91,8 +91,8 @@ BEGIN
         [PasswordHash] NVARCHAR(500) NOT NULL,
         [Role] NVARCHAR(50) NOT NULL CHECK ([Role] IN ('Customer', 'Rider', 'Admin')),
         [IsActive] BIT NOT NULL DEFAULT 1,
-        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
-        [UpdatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+        --, [UpdatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
     );
     CREATE INDEX IX_Users_Username ON [dbo].[Users]([Username]);
     CREATE INDEX IX_Users_Email ON [dbo].[Users]([Email]);

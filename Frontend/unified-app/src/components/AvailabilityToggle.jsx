@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../utils/AuthContext';
 import { riderService } from '../services/api';
+import safeStorage from '../utils/storage';
 
 const AvailabilityToggle = () => {
   const { riderId } = useAuth();
@@ -15,7 +16,7 @@ const AvailabilityToggle = () => {
       
       if (!currentRiderId) {
         // Try localStorage as fallback
-        const storedRiderId = localStorage.getItem('riderId');
+        const storedRiderId = safeStorage.getItem('riderId');
         if (storedRiderId) {
           console.log('[AvailabilityToggle] Using riderId from localStorage:', storedRiderId);
           currentRiderId = storedRiderId;
@@ -23,7 +24,7 @@ const AvailabilityToggle = () => {
           console.warn('[AvailabilityToggle] No riderId available yet, will retry...');
           // Retry after a delay
           const retryTimer = setTimeout(() => {
-            const retryRiderId = localStorage.getItem('riderId');
+            const retryRiderId = safeStorage.getItem('riderId');
             if (retryRiderId) {
               loadAvailability();
             }
@@ -54,7 +55,7 @@ const AvailabilityToggle = () => {
         setIsOnline(isOnlineValue);
         
         // Save to localStorage as backup
-        localStorage.setItem(`rider_${numericRiderId}_online`, isOnlineValue.toString());
+        safeStorage.setItem(`rider_${numericRiderId}_online`, isOnlineValue.toString());
       } catch (error) {
         console.error('[AvailabilityToggle] Error loading availability:', error);
         console.error('[AvailabilityToggle] Error details:', {
@@ -65,7 +66,7 @@ const AvailabilityToggle = () => {
         // Fallback to localStorage
         const numericRiderId = typeof currentRiderId === 'string' ? parseInt(currentRiderId, 10) : currentRiderId;
         if (!isNaN(numericRiderId) && numericRiderId > 0) {
-          const savedStatus = localStorage.getItem(`rider_${numericRiderId}_online`);
+          const savedStatus = safeStorage.getItem(`rider_${numericRiderId}_online`);
           if (savedStatus !== null) {
             console.log('[AvailabilityToggle] Using saved availability status from localStorage:', savedStatus);
             setIsOnline(savedStatus === 'true');
@@ -116,7 +117,7 @@ const AvailabilityToggle = () => {
     
     if (!currentRiderId) {
       // Try to get from localStorage
-      const storedRiderId = localStorage.getItem('riderId');
+      const storedRiderId = safeStorage.getItem('riderId');
       if (storedRiderId) {
         console.log('[AvailabilityToggle] Using riderId from localStorage for toggle');
         currentRiderId = storedRiderId;
@@ -182,7 +183,7 @@ const AvailabilityToggle = () => {
         setIsOnline(actualStatus);
         
         // Save to localStorage as backup
-        localStorage.setItem(`rider_${numericRiderId}_online`, actualStatus.toString());
+        safeStorage.setItem(`rider_${numericRiderId}_online`, actualStatus.toString());
         
         console.log(`[AvailabilityToggle] === TOGGLE SUCCESS ===`);
         console.log(`[AvailabilityToggle] Final status: ${actualStatus ? 'Online' : 'Offline'}`);
@@ -193,7 +194,7 @@ const AvailabilityToggle = () => {
           stack: refreshError.stack
         });
         // Keep the optimistic update
-        localStorage.setItem(`rider_${numericRiderId}_online`, newStatus.toString());
+        safeStorage.setItem(`rider_${numericRiderId}_online`, newStatus.toString());
         console.log('[AvailabilityToggle] Using optimistic update status:', newStatus);
       }
       
@@ -231,8 +232,8 @@ const AvailabilityToggle = () => {
   };
 
   // Get riderId for display purposes (from context or localStorage)
-  const displayRiderId = riderId || localStorage.getItem('riderId');
-  const isDisabled = loading || (!riderId && !localStorage.getItem('riderId'));
+  const displayRiderId = riderId || safeStorage.getItem('riderId');
+  const isDisabled = loading || (!riderId && !safeStorage.getItem('riderId'));
 
   return (
     <div className="card">

@@ -27,11 +27,13 @@ const AdminDashboardPage = () => {
     loadDashboardData();
     loadPendingOrders();
     
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 10 seconds to catch new orders quickly
+    // Orders appear as "Pending" immediately after customer creates them
     const interval = setInterval(() => {
+      console.log('[AdminDashboard] Auto-refreshing pending orders (10s interval)...');
       loadDashboardData();
       loadPendingOrders();
-    }, 30000);
+    }, 10000);
     
     return () => clearInterval(interval);
   }, []);
@@ -41,23 +43,61 @@ const AdminDashboardPage = () => {
       setLoading(true);
       console.log('[AdminDashboard] Loading dashboard data...');
       
-      // Use endpoints that include order/availability data
-      const [activeDeliveries, allRiders] = await Promise.all([
-        deliveryService.getActiveDeliveriesWithOrders().catch(err => {
-          console.warn('[AdminDashboard] Failed to get deliveries with orders, falling back:', err);
-          return deliveryService.getActiveDeliveries();
+      // Fetch deliveries and riders in parallel
+      const [activeDeliveries, allRiders, allOrders] = await Promise.all([
+        deliveryService.getActiveDeliveries().catch(err => {
+          console.warn('[AdminDashboard] Failed to get deliveries:', err);
+          return [];
         }),
         riderService.getAllRidersWithAvailability().catch(err => {
           console.warn('[AdminDashboard] Failed to get riders with availability, falling back:', err);
           return riderService.getAllRiders();
+        }),
+        orderService.getAllOrders().catch(err => {
+          console.warn('[AdminDashboard] Failed to get orders:', err);
+          return [];
         })
       ]);
       
       console.log('[AdminDashboard] Loaded deliveries:', activeDeliveries?.length || 0);
       console.log('[AdminDashboard] Loaded riders:', allRiders?.length || 0);
+      console.log('[AdminDashboard] Loaded orders:', allOrders?.length || 0);
       
-      // Handle both DTO format (with order) and regular format
-      const deliveries = activeDeliveries || [];
+      // Create order lookup map for quick access
+      const orderMap = {};
+      (allOrders || []).forEach(o => {
+        const orderId = o.orderId || o.OrderId;
+        if (orderId) orderMap[orderId] = o;
+      });
+      
+      // Create rider lookup map for quick access
+      const riderMap = {};
+      (allRiders || []).forEach(r => {
+        const riderId = r.riderId || r.RiderId;
+        if (riderId) riderMap[riderId] = r;
+      });
+      
+      // Enrich deliveries with order and rider information
+      const enrichedDeliveries = (activeDeliveries || []).map(d => {
+        const orderId = d.orderId || d.OrderId;
+        const riderId = d.riderId || d.RiderId;
+        const order = orderMap[orderId] || {};
+        const rider = riderMap[riderId] || {};
+        
+        return {
+          ...d,
+          order: {
+            customerName: order.customerName || order.CustomerName || 'N/A',
+            customerPhone: order.customerPhone || order.CustomerPhone || 'N/A',
+            deliveryAddress: order.deliveryAddress || order.DeliveryAddress || 'N/A',
+            orderTotal: order.orderTotal || order.OrderTotal || 0
+          },
+          riderName: rider.fullName || rider.FullName || (riderId ? `Rider #${riderId}` : 'Unassigned')
+        };
+      });
+      
+      console.log('[AdminDashboard] Enriched deliveries:', enrichedDeliveries.length);
+      
       const riders = allRiders || [];
       
       // Check for online status - handle both camelCase and PascalCase
@@ -68,7 +108,7 @@ const AdminDashboardPage = () => {
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayDeliveries = deliveries.filter(d => {
+      const todayDeliveries = enrichedDeliveries.filter(d => {
         const assignedAt = d.assignedAt || d.AssignedAt;
         if (!assignedAt) return false;
         const assignedDate = new Date(assignedAt);
@@ -76,18 +116,16 @@ const AdminDashboardPage = () => {
         return assignedDate.getTime() === today.getTime();
       }).length;
       
-      setStats({
-        activeDeliveries: deliveries.length,
-        pendingAssignments: deliveries.filter(d => {
-          const riderId = d.riderId || d.RiderId;
-          const status = d.status || d.Status;
-          return !riderId || status === 'Pending';
-        }).length,
+      // Note: pendingAssignments is set by loadPendingOrders() from SQL (single source of truth)
+      // We only update the other stats here to avoid overwriting the SQL-based pendingAssignments
+      setStats(prev => ({
+        ...prev,
+        activeDeliveries: enrichedDeliveries.length,
         onlineRiders: onlineRiders,
         todayDeliveries: todayDeliveries
-      });
+      }));
       
-      setDeliveries(deliveries.slice(0, 10));
+      setDeliveries(enrichedDeliveries.slice(0, 10));
     } catch (error) {
       console.error('[AdminDashboard] Error loading dashboard data:', error);
     } finally {
@@ -95,49 +133,45 @@ const AdminDashboardPage = () => {
     }
   };
 
+  /**
+   * Load pending assignments directly from the SQL backend.
+   * This uses the dedicated /api/orders/pending-assignments endpoint which is
+   * the SINGLE SOURCE OF TRUTH for pending assignments.
+   * 
+   * No local filtering is done - data comes directly from SQL.
+   */
   const loadPendingOrders = async () => {
     try {
       setLoadingPendingOrders(true);
-      console.log('[AdminDashboard] Loading pending/unassigned orders...');
+      console.log('[AdminDashboard] Loading pending assignments from SQL (single source of truth)...');
       
-      // Get all orders
-      const allOrders = await orderService.getAllOrders();
-      console.log('[AdminDashboard] All orders loaded:', allOrders?.length || 0);
+      // Use the dedicated pending-assignments endpoint - NO local filtering!
+      const pendingAssignments = await orderService.getPendingAssignments();
       
-      // Get all active deliveries to check which orders are assigned
-      const allDeliveries = await deliveryService.getActiveDeliveries().catch(() => []);
-      console.log('[AdminDashboard] All deliveries loaded:', allDeliveries?.length || 0);
+      console.log('[AdminDashboard] Pending assignments from SQL:', pendingAssignments?.length || 0);
       
-      // Create a set of order IDs that have active assignments
-      const assignedOrderIds = new Set(
-        allDeliveries
-          .filter(d => {
-            const riderId = d.riderId || d.RiderId;
-            const status = d.status || d.Status;
-            // Only count orders with active assignments (rider assigned and status not "Pending")
-            return riderId && status && status !== 'Pending';
-          })
-          .map(d => d.orderId || d.OrderId)
-      );
+      // Log details for debugging
+      if (pendingAssignments && pendingAssignments.length > 0) {
+        console.log('[AdminDashboard] Pending assignment details:', 
+          pendingAssignments.map(p => ({
+            orderId: p.orderId || p.OrderId,
+            status: p.status || p.Status,
+            deliveryId: p.deliveryId || p.DeliveryId,
+            pendingReason: p.pendingReason || p.PendingReason
+          }))
+        );
+      }
       
-      // Filter to get pending/unassigned orders
-      const pending = (allOrders || [])
-        .filter(order => {
-          const orderId = order.orderId || order.OrderId;
-          const status = order.status || order.Status;
-          // Include orders that are "Pending" and don't have an active assignment
-          return status === 'Pending' && !assignedOrderIds.has(orderId);
-        })
-        .sort((a, b) => {
-          const dateA = new Date(a.orderDate || a.OrderDate || 0);
-          const dateB = new Date(b.orderDate || b.OrderDate || 0);
-          return dateB - dateA; // Most recent first
-        });
+      setPendingOrders(pendingAssignments || []);
       
-      console.log('[AdminDashboard] Found pending/unassigned orders:', pending.length);
-      setPendingOrders(pending);
+      // Update the stats.pendingAssignments count to match SQL data
+      setStats(prev => ({
+        ...prev,
+        pendingAssignments: pendingAssignments?.length || 0
+      }));
+      
     } catch (error) {
-      console.error('[AdminDashboard] Error loading pending orders:', error);
+      console.error('[AdminDashboard] Error loading pending assignments from SQL:', error);
       setPendingOrders([]);
     } finally {
       setLoadingPendingOrders(false);
@@ -308,38 +342,45 @@ const AdminDashboardPage = () => {
     setAvailableRiders([]);
   };
 
-  return (
-    <>
-      <Navbar />
-      <div className="container-fluid page-container">
-      {/* Statistics Cards */}
+return (
+  <>
+    <Navbar />
+
+    <div className="container-fluid page-container">
+
+      {/* =======================
+          STATISTICS CARDS
+      ======================= */}
       <div className="row mb-4">
-        <div className="col-md-3">
-          <div className="card text-white bg-primary stat-card">
+        <div className="col-6 col-md-3 mb-3">
+          <div className="card stat-card stat-primary">
             <div className="card-body">
               <h5 className="card-title">Active Deliveries</h5>
               <h2>{stats.activeDeliveries}</h2>
             </div>
           </div>
         </div>
-        <div className="col-md-3">
-          <div className="card text-white bg-success stat-card">
+
+        <div className="col-6 col-md-3 mb-3">
+          <div className="card stat-card stat-success">
             <div className="card-body">
               <h5 className="card-title">Online Riders</h5>
               <h2>{stats.onlineRiders}</h2>
             </div>
           </div>
         </div>
-        <div className="col-md-3">
-          <div className="card text-white bg-warning stat-card">
+
+        <div className="col-6 col-md-3 mb-3">
+          <div className="card stat-card stat-warning">
             <div className="card-body">
               <h5 className="card-title">Pending Assignments</h5>
               <h2>{stats.pendingAssignments}</h2>
             </div>
           </div>
         </div>
-        <div className="col-md-3">
-          <div className="card text-white bg-info stat-card">
+
+        <div className="col-6 col-md-3 mb-3">
+          <div className="card stat-card stat-info">
             <div className="card-body">
               <h5 className="card-title">Today's Deliveries</h5>
               <h2>{stats.todayDeliveries}</h2>
@@ -348,149 +389,79 @@ const AdminDashboardPage = () => {
         </div>
       </div>
 
-      {/* Pending/Unassigned Orders */}
-      {pendingOrders.length > 0 && (
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="card border-warning">
-              <div className="card-header bg-warning text-dark">
-                <h5 className="mb-0">
-                  <i className="bi bi-exclamation-triangle"></i> Pending Orders ({pendingOrders.length})
-                  <small className="ms-2">Orders waiting for rider assignment</small>
-                </h5>
-              </div>
-              <div className="card-body">
-                {loadingPendingOrders ? (
-                  <div className="text-center py-3">
-                    <div className="spinner-border spinner-border-sm" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table table-sm table-hover">
-                      <thead>
-                        <tr>
-                          <th>Order ID</th>
-                          <th>Customer</th>
-                          <th>Address</th>
-                          <th>Order Date</th>
-                          <th>Total</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pendingOrders.slice(0, 10).map((order) => {
-                          const orderId = order.orderId || order.OrderId;
-                          return (
-                            <tr key={orderId}>
-                              <td><strong>#{orderId}</strong></td>
-                              <td>{order.customerName || order.CustomerName || 'N/A'}</td>
-                              <td>
-                                <small>{order.deliveryAddress || order.DeliveryAddress || 'N/A'}</small>
-                              </td>
-                              <td>
-                                {order.orderDate || order.OrderDate 
-                                  ? new Date(order.orderDate || order.OrderDate).toLocaleString() 
-                                  : 'N/A'}
-                              </td>
-                              <td>₱{parseFloat(order.orderTotal || order.OrderTotal || 0).toFixed(2)}</td>
-                              <td>
-                                <button 
-                                  className="btn btn-sm btn-success"
-                                  onClick={() => handleAssignOrderClick(order)}
-                                  title="Assign this order to a rider"
-                                >
-                                  <i className="bi bi-person-plus"></i> Assign
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                    {pendingOrders.length > 10 && (
-                      <div className="text-center mt-2">
-                        <small className="text-muted">Showing first 10 of {pendingOrders.length} pending orders</small>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recent Deliveries */}
-      <div className="row">
+      {/* =======================
+          PENDING ORDERS
+      ======================= */}
+      <div className="row mb-4">
         <div className="col-12">
-          <h4 className="mb-3">Recent Deliveries</h4>
           <div className="card">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <div>
+                <h5 className="mb-0">Pending Orders ({pendingOrders.length})</h5>
+                <small className="text-muted">Orders waiting for rider assignment</small>
+              </div>
+
+              <button
+                className="btn btn-outline-secondary btn-sm"
+                onClick={loadPendingOrders}
+                disabled={loadingPendingOrders}
+              >
+                Refresh
+              </button>
+            </div>
+
             <div className="card-body">
-              {loading && (
-                <div className="text-center">
-                  <div className="spinner-border" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
+              {loadingPendingOrders ? (
+                <div className="text-center py-4">
+                  <div className="spinner-border spinner-border-sm" />
                 </div>
-              )}
-              {!loading && (
+              ) : pendingOrders.length === 0 ? (
+                <div className="text-center py-4 text-muted">
+                  <p>No pending orders</p>
+                  <small>New customer orders will appear here automatically</small>
+                </div>
+              ) : (
                 <div className="table-responsive">
-                  <table className="table table-striped">
+                  <table className="table table-hover table-sm">
                     <thead>
                       <tr>
                         <th>Order ID</th>
                         <th>Customer</th>
-                        <th>Status</th>
-                        <th>Assigned At</th>
-                        <th>Actions</th>
+                        <th>Address</th>
+                        <th>Date</th>
+                        <th>Total</th>
+                        <th>Reason</th>
+                        <th></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {deliveries.length === 0 ? (
-                        <tr>
-                          <td colSpan="5" className="text-center">
-                            No deliveries found
-                          </td>
-                        </tr>
-                      ) : (
-                        deliveries.map((delivery) => {
-                          // Handle both DTO format (order property) and regular format
-                          const order = delivery.order || delivery.Order || {};
-                          const orderId = delivery.orderId || delivery.OrderId;
-                          const riderId = delivery.riderId || delivery.RiderId;
-                          const status = delivery.status || delivery.Status;
-                          const assignedAt = delivery.assignedAt || delivery.AssignedAt;
-                          
-                          return (
-                            <tr key={orderId}>
-                              <td>#{orderId}</td>
-                              <td>{order.customerName || order.CustomerName || 'N/A'}</td>
-                              <td>
-                                <span className="badge bg-primary">{status}</span>
-                              </td>
-                              <td>{assignedAt ? new Date(assignedAt).toLocaleString() : 'N/A'}</td>
-                              <td>
-                                <button 
-                                  className="btn btn-sm btn-primary me-2"
-                                  onClick={() => handleViewDelivery(delivery)}
-                                >
-                                  View
-                                </button>
-                                {!riderId && (
-                                  <button 
-                                    className="btn btn-sm btn-success"
-                                    onClick={() => handleAssignClick(delivery)}
-                                  >
-                                    Assign
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
+                      {pendingOrders.slice(0, 10).map(order => {
+                        const orderId = order.orderId || order.OrderId;
+                        const reason = order.pendingReason || order.PendingReason || 'Unassigned';
+
+                        return (
+                          <tr key={orderId}>
+                            <td><strong>#{orderId}</strong></td>
+                            <td>{order.customerName || order.CustomerName || 'N/A'}</td>
+                            <td><small>{order.deliveryAddress || order.DeliveryAddress || 'N/A'}</small></td>
+                            <td>
+                              {order.orderDate || order.OrderDate
+                                ? new Date(order.orderDate || order.OrderDate).toLocaleString()
+                                : 'N/A'}
+                            </td>
+                            <td>₱{Number(order.orderTotal || order.OrderTotal || 0).toFixed(2)}</td>
+                            <td><small className="text-muted">{reason}</small></td>
+                            <td>
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => handleAssignOrderClick(order)}
+                              >
+                                Assign
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -500,267 +471,74 @@ const AdminDashboardPage = () => {
         </div>
       </div>
 
-      {/* View Delivery Modal */}
-      {showViewModal && selectedDelivery && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Delivery Details - Order #{selectedDelivery.orderId}</h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={handleCloseModals}
-                  aria-label="Close"
-                ></button>
-              </div>
-              <div className="modal-body">
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <strong>Order ID:</strong> #{selectedDelivery.orderId}
-                  </div>
-                  <div className="col-md-6">
-                    <strong>Status:</strong>{' '}
-                    <span className="badge bg-primary">{selectedDelivery.status}</span>
-                  </div>
-                </div>
-                {selectedDelivery.order && (
-                  <>
-                    <div className="row mb-3">
-                      <div className="col-md-6">
-                        <strong>Customer Name:</strong> {selectedDelivery.order.customerName || 'N/A'}
-                      </div>
-                      <div className="col-md-6">
-                        <strong>Customer Phone:</strong> {selectedDelivery.order.customerPhone || 'N/A'}
-                      </div>
-                    </div>
-                    <div className="row mb-3">
-                      <div className="col-12">
-                        <strong>Delivery Address:</strong> {selectedDelivery.order.deliveryAddress || 'N/A'}
-                      </div>
-                    </div>
-                  </>
-                )}
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <strong>Assigned At:</strong>{' '}
-                    {selectedDelivery.assignedAt 
-                      ? new Date(selectedDelivery.assignedAt).toLocaleString() 
-                      : 'N/A'}
-                  </div>
-                  <div className="col-md-6">
-                    <strong>Rider ID:</strong> {selectedDelivery.riderId || 'Not assigned'}
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={handleCloseModals}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* =======================
+          RECENT DELIVERIES
+      ======================= */}
+      <div className="row">
+        <div className="col-12">
+          <h4 className="mb-3">Recent Deliveries</h4>
 
-      {/* Assign Delivery Modal */}
-      {showAssignModal && selectedDelivery && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Assign Delivery - Order #{selectedDelivery.orderId}</h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={handleCloseModals}
-                  aria-label="Close"
-                ></button>
-              </div>
-              <div className="modal-body">
-                <p>Select a rider for this delivery:</p>
-                {loadingRiders ? (
-                  <div className="text-center py-3">
-                    <div className="spinner-border spinner-border-sm" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                  </div>
-                ) : availableRiders.length === 0 ? (
-                  <div className="alert alert-warning">No online riders available.</div>
-                ) : (
-                  <div className="list-group">
-                    {availableRiders.map((rider) => (
-                      <button
-                        key={rider.riderId}
-                        type="button"
-                        className="list-group-item list-group-item-action"
-                        onClick={() => handleAssign(rider.riderId)}
-                        disabled={assigning}
-                      >
-                        <div>
-                          <strong>{rider.fullName}</strong>
-                          <br />
-                          <small className="text-muted">
-                            {rider.vehicleType} - {rider.phoneNumber}
-                          </small>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {assigning && (
-                  <div className="text-center mt-3">
-                    <div className="spinner-border spinner-border-sm" role="status">
-                      <span className="visually-hidden">Assigning...</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={handleCloseModals}
-                  disabled={assigning}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Assign Order Modal (for pending/unassigned orders) */}
-      {showAssignOrderModal && selectedOrder && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header bg-success text-white">
-                <h5 className="modal-title">
-                  <i className="bi bi-person-plus"></i> Assign Order #{selectedOrder.orderId || selectedOrder.OrderId}
-                </h5>
-                <button 
-                  type="button" 
-                  className="btn-close btn-close-white" 
-                  onClick={handleCloseModals}
-                  aria-label="Close"
-                ></button>
-              </div>
-              <div className="modal-body">
-                {/* Order Details */}
-                <div className="card mb-3">
-                  <div className="card-body">
-                    <h6 className="card-title">Order Details</h6>
-                    <div className="row">
-                      <div className="col-md-6">
-                        <strong>Customer:</strong> {selectedOrder.customerName || selectedOrder.CustomerName || 'N/A'}
-                      </div>
-                      <div className="col-md-6">
-                        <strong>Phone:</strong> {selectedOrder.customerPhone || selectedOrder.CustomerPhone || 'N/A'}
-                      </div>
-                    </div>
-                    <div className="row mt-2">
-                      <div className="col-12">
-                        <strong>Address:</strong> {selectedOrder.deliveryAddress || selectedOrder.DeliveryAddress || 'N/A'}
-                      </div>
-                    </div>
-                    <div className="row mt-2">
-                      <div className="col-md-6">
-                        <strong>Total:</strong> ₱{parseFloat(selectedOrder.orderTotal || selectedOrder.OrderTotal || 0).toFixed(2)}
-                      </div>
-                      <div className="col-md-6">
-                        <strong>Status:</strong> <span className="badge bg-warning">{selectedOrder.status || selectedOrder.Status || 'Pending'}</span>
-                      </div>
-                    </div>
-                  </div>
+          <div className="card">
+            <div className="card-body">
+              {loading ? (
+                <div className="text-center">
+                  <div className="spinner-border" />
                 </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-striped">
+                    <thead>
+                      <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Rider</th>
+                        <th>Status</th>
+                        <th>Assigned</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deliveries.map(delivery => {
+                        const orderId = delivery.orderId || delivery.OrderId;
 
-                {/* Rider Selection */}
-                <div>
-                  <h6>Select an Online Rider:</h6>
-                  {loadingRiders ? (
-                    <div className="text-center py-3">
-                      <div className="spinner-border spinner-border-sm" role="status">
-                        <span className="visually-hidden">Loading riders...</span>
-                      </div>
-                    </div>
-                  ) : availableRiders.length === 0 ? (
-                    <div className="alert alert-warning">
-                      <i className="bi bi-exclamation-triangle"></i> No online riders available. 
-                      Please wait for a rider to come online, or the system will auto-assign when a rider becomes available.
-                    </div>
-                  ) : (
-                    <div className="list-group">
-                      {availableRiders.map((rider) => {
-                        const riderId = rider.riderId || rider.RiderId;
-                        const fullName = rider.fullName || rider.FullName || 'Unknown';
-                        const vehicleType = rider.vehicleType || rider.VehicleType || 'N/A';
-                        const phoneNumber = rider.phoneNumber || rider.PhoneNumber || 'N/A';
-                        const isOnline = rider.isOnline || rider.IsOnline || false;
-                        
                         return (
-                          <button
-                            key={riderId}
-                            type="button"
-                            className="list-group-item list-group-item-action"
-                            onClick={() => handleAssignOrder(riderId)}
-                            disabled={assigning || !isOnline}
-                          >
-                            <div className="d-flex justify-content-between align-items-center">
-                              <div>
-                                <strong>{fullName}</strong>
-                                <br />
-                                <small className="text-muted">
-                                  <i className="bi bi-bicycle"></i> {vehicleType} | 
-                                  <i className="bi bi-telephone ms-2"></i> {phoneNumber}
-                                </small>
-                              </div>
-                              <div>
-                                {isOnline && (
-                                  <span className="badge bg-success">
-                                    <i className="bi bi-circle-fill"></i> Online
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </button>
+                          <tr key={orderId}>
+                            <td>#{orderId}</td>
+                            <td>{delivery.order?.customerName || 'N/A'}</td>
+                            <td>{delivery.riderName}</td>
+                            <td>
+                              <span className={`status-badge status-${delivery.status?.toLowerCase()}`}>
+                                {delivery.status}
+                              </span>
+                            </td>
+                            <td>
+                              {delivery.assignedAt
+                                ? new Date(delivery.assignedAt).toLocaleString()
+                                : 'N/A'}
+                            </td>
+                            <td>
+                              <button
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={() => handleViewDelivery(delivery)}
+                              >
+                                View
+                              </button>
+                            </td>
+                          </tr>
                         );
                       })}
-                    </div>
-                  )}
+                    </tbody>
+                  </table>
                 </div>
-
-                {assigning && (
-                  <div className="text-center mt-3">
-                    <div className="spinner-border spinner-border-sm text-success" role="status">
-                      <span className="visually-hidden">Assigning order...</span>
-                    </div>
-                    <p className="mt-2 text-muted">Assigning order to rider...</p>
-                  </div>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={handleCloseModals}
-                  disabled={assigning}
-                >
-                  Cancel
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </div>
-      )}
       </div>
-    </>
-  );
+
+    </div>
+  </>
+);
 };
 
 export default AdminDashboardPage;

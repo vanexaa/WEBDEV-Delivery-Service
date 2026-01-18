@@ -1,0 +1,264 @@
+/* ===============================
+   Kapebara Navbar
+   =============================== */
+
+.kapebara-navbar {
+    display: flex; /* Changed from grid to flex for better horizontal control */
+    justify-content: space-between; 
+    align-items: center;
+    padding: 1.2rem 5%;
+    background-color: white;
+    width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 2002;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+}
+
+.logo-container {
+    justify-self: start;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.logo-img {
+    height: 40px;
+    object-fit: contain;
+}
+
+.logo-text {
+    font-size: 1.8rem;
+    font-weight: 800;
+}
+
+/* CENTER LINKS */
+.kapebara-nav-links {
+    display: flex;
+    gap: 24px; /* Reduced from 40px for better fit */
+    margin-right: 0; /* Removed the 60px margin */
+    flex-grow: 1;
+    justify-content: center; /* This keeps them centered between logo and icons */
+}
+
+@media (max-width: 1024px) {
+    .kapebara-nav-links {
+        gap: 15px; /* Tighter spacing for tablets */
+    }
+    .logo-text {
+        font-size: 1.4rem; /* Shrink logo text slightly */
+    }
+}
+
+.kapebara-nav-links .nav-link {
+  font-family: "DM Sans", sans-serif;
+  font-weight: 600;
+  color: #1C1C1C;
+  text-decoration: none;
+  position: relative;
+}
+
+.kapebara-nav-links .nav-link.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 100%;
+  height: 2px;
+  background-color: #3B302A;
+}
+
+/* RIGHT ICONS */
+.kapebara-nav-icons {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: #1C1C1C;
+  cursor: pointer;
+}
+
+/* PROFILE DROPDOWN */
+/* DROPDOWN CARD */
+.profile-menu {
+  position: relative;
+}
+
+/* DROPDOWN CARD */
+.profile-dropdown-card {
+  position: absolute;
+  top: 48px;
+  right: 0;
+
+  background: #ffffff;
+  border-radius: 12px !important;
+  min-width: 220px;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 6px 0;
+
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+  z-index: 3000;
+}
+
+/* MENU ITEMS */
+.dropdown-item {
+  background: none;
+  border: none;
+
+  padding: 14px 18px;
+  width: 100%;
+
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+
+  color: #1C1C1C;
+  text-align: center;
+
+  cursor: pointer;
+}
+
+/* DIVIDER LINES */
+.dropdown-item:not(:last-child) {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.90) !important;
+}
+
+/* LOG OUT COLOR */
+.dropdown-item.danger {
+  color: #D32F2F;
+}
+
+/* ===============================
+   Kapebara – Interactive Stat Cards
+   =============================== */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); /* 4 columns on desktop */
+    gap: 20px;
+    padding: 20px 5%;
+}
+
+/* Tablet: 2 columns */
+@media (max-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Mobile: 1 column */
+@media (max-width: 600px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.stat-card {
+  background-color: #ffffff;
+  border-radius: 14px;
+  border: 1px solid rgba(59, 48, 42, 0.08);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
+  transition: 
+    background-color 0.25s ease,
+    color 0.25s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+/* Hover effect */
+.stat-card:hover {
+  background-color: #3B302A; /* Kapebara coffee brown */
+  transform: translateY(-4px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+}
+
+/* Turn ALL text white on hover */
+.stat-card:hover h2,
+.stat-card:hover h5,
+.stat-card:hover .card-title,
+.stat-card:hover * {
+  color: #ffffff !important;
+}
+
+/* Optional: remove colored left border on hover */
+.stat-card:hover {
+  border-color: transparent;
+}
+
+/* Smooth number emphasis */
+.stat-card h2 {
+  transition: color 0.25s ease;
+}
+
+.stat-card h5 {
+  transition: color 0.25s ease;
+}
+.stat-card .card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  transition: color 0.25s ease;
+}
+
+/* ===============================
+   Navbar – Mobile Fix
+   =============================== */
+
+.mobile-menu-btn {
+  display: none;
+}
+
+/* Desktop */
+@media (min-width: 769px) {
+  .kapebara-nav-links {
+    display: flex;
+    gap: 32px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .kapebara-nav-links {
+    display: none; /* hide center links only */
+  }
+
+  .mobile-menu-btn {
+    display: block;
+    font-size: 1.4rem;
+  }
+.kapebara-mobile-menu {
+  position: fixed;
+  top: 72px; /* height of navbar */
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  z-index: 2001;
+
+  display: flex;
+  flex-direction: column;
+  padding: 16px 24px;
+
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+}
+
+  .kapebara-mobile-menu .nav-link {
+  padding: 14px 0;
+  font-family: "DM Sans", sans-serif;
+  font-weight: 600;
+  color: #1C1C1C;
+  text-decoration: none;
+}
+
+.kapebara-mobile-menu .nav-link:not(:last-child) {
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+}
+

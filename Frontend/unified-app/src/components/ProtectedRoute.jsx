@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import safeStorage from '../utils/storage';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const [isAuthorized, setIsAuthorized] = useState(null);
@@ -8,8 +9,8 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   useEffect(() => {
     const checkAuthorization = async () => {
       try {
-        const token = localStorage.getItem('authToken');
-        const userData = localStorage.getItem('user');
+        const token = safeStorage.getItem('authToken');
+        const userData = safeStorage.getItem('user');
         
         if (!token || !userData) {
           console.log('[ProtectedRoute] No token or user data found');

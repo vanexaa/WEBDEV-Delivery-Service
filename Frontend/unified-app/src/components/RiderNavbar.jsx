@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
+import safeStorage, { safeSessionStorage } from '../utils/storage';
 
 const RiderNavbar = () => {
   const { logout, user, riderProfile } = useAuth();
@@ -10,8 +11,8 @@ const RiderNavbar = () => {
   const handleLogout = () => {
     logout();
     // Clear all storage and redirect to login page
-    localStorage.clear();
-    sessionStorage.clear();
+    safeStorage.clear();
+    safeSessionStorage.clear();
     window.location.href = '/login';
   };
 

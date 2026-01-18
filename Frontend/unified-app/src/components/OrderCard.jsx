@@ -1,38 +1,60 @@
 import React from 'react';
+import './OrderCard.css'; // 👈 add this
 
 const OrderCard = ({ order, onClick }) => {
   const orderData = order.order || {};
-  const statusColors = {
-    Assigned: 'bg-secondary',
-    Accepted: 'bg-info',
-    PickedUp: 'bg-warning',
-    InTransit: 'bg-primary',
-    Delivered: 'bg-success',
-    Failed: 'bg-danger'
+
+  // Kapebara-aligned status styles
+  const statusClassMap = {
+    Assigned: 'status-assigned',
+    Accepted: 'status-accepted',
+    PickedUp: 'status-pickedup',
+    InTransit: 'status-transit',
+    Delivered: 'status-delivered',
+    Failed: 'status-failed'
   };
 
   return (
     <div className="card order-card" onClick={onClick}>
       <div className="card-body">
+
+        {/* Header */}
         <div className="d-flex justify-content-between align-items-start mb-2">
-          <h6 className="card-title">{order.transactionCode}</h6>
-          <span className={`badge ${statusColors[order.status] || 'bg-secondary'} status-badge`}>
+          <h6 className="order-title">
+            {order.transactionCode}
+          </h6>
+
+          <span
+            className={`status-badge ${
+              statusClassMap[order.status] || 'status-assigned'
+            }`}
+          >
             {order.status}
           </span>
         </div>
-        <p className="card-text mb-1">
-          <small className="text-muted">Customer:</small> {orderData.customerName || 'N/A'}
+
+        {/* Customer */}
+        <p className="order-text">
+          <span className="order-label">Customer:</span>{' '}
+          {orderData.customerName || 'N/A'}
         </p>
-        <p className="card-text mb-1">
-          <small className="text-muted">Address:</small>{' '}
+
+        {/* Address */}
+        <p className="order-text">
+          <span className="order-label">Address:</span>{' '}
           {orderData.deliveryAddress
-            ? `${orderData.deliveryAddress.substring(0, 30)}...`
+            ? `${orderData.deliveryAddress.substring(0, 30)}…`
             : 'N/A'}
         </p>
-        <p className="card-text">
-          <small className="text-muted">Assigned:</small>{' '}
-          {new Date(order.assignedAt).toLocaleString()}
+
+        {/* Assigned time */}
+        <p className="order-text">
+          <span className="order-label">Assigned:</span>{' '}
+          {order.assignedAt
+            ? new Date(order.assignedAt).toLocaleString()
+            : 'N/A'}
         </p>
+
       </div>
     </div>
   );
