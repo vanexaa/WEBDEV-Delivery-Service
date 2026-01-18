@@ -1,0 +1,71 @@
+Changed database context to 'CustomerServiceDB'.
+✓ Customer record already exists for customer1
+Changed database context to 'OrderServiceDB'.
+ 
+========================================
+Creating Test Order
+========================================
+ 
+Found CustomerId: 1
+⚠ Test order already exists. Deleting old test order...
+
+(1 rows affected)
+✓ Old test order deleted
+
+(1 rows affected)
+ 
+✓ Test order created successfully!
+ 
+========================================
+Test Order Details
+========================================
+  Order ID: 4
+  Customer ID: 1
+  Customer Name: Test Customer
+  Customer Phone: 123-456-7890
+  Order Total: $25.99
+  Payment Method: COD (Cash on Delivery)
+  Status: Pending
+  Delivery Address: 123 Main Street, Test City, TC 12345
+  Special Instructions: Please ring doorbell twice. Leave package at front door if no answer.
+ 
+========================================
+Testing Instructions
+========================================
+ 
+1. TEST ORDER CREATION:
+   - Order ID 4 should appear in OrderService
+ 
+2. TEST DELIVERY ASSIGNMENT (Admin App):
+   - Login as admin (admin / password123)
+   - Go to Deliveries page
+   - Assign Order ID 4 to a rider
+   - Verify delivery record is created in DeliveryService
+ 
+3. TEST ORDER TRACKING (Customer App):
+   - Login as customer1 (customer1 / password123)
+   - Track Order ID 4
+   - Verify order status and delivery information displays
+ 
+4. TEST DELIVERY UPDATES (Rider App):
+   - Login as rider1 (rider1 / password123)
+   - View assigned orders
+   - Update delivery status (Picked Up, In Transit, Delivered)
+   - Verify status updates reflect in customer app
+ 
+5. TEST ADMIN DASHBOARD:
+   - View all orders in admin app
+   - View all deliveries
+   - View all riders
+ 
+========================================
+Test Accounts
+========================================
+  Customer: customer1 / password123
+  Rider:    rider1 / password123
+  Admin:    admin / password123
+ 
+========================================
+Script completed successfully!
+========================================
+ 
