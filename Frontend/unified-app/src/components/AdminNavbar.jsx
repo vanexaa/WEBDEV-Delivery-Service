@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
-import '../css/Navbar.css'; // 👈 we’ll add this
+import '../css/AdminNavbar.css'; // 👈 we’ll add this
 import logo from '../assets/logo.png'; // 👈 make sure to have a logo image
 
 const Navbar = () => {
@@ -51,33 +51,29 @@ const Navbar = () => {
 
         {/* RIGHT – ICONS */}
         <div className="kapebara-nav-icons">
-          <Link to="/orders" className="icon-btn" title="Cart">
-            <i className="bi bi-bag"></i>
-          </Link>
-
           <button className="icon-btn" title="Notifications">
             <i className="bi bi-bell"></i>
           </button>
 
           <div className="profile-menu">
-          <button
-            className="icon-btn"
-              on Click={() => setShowProfileMenu(!showProfileMenu)}
-              aria-label="Profile">
-            <i className="bi bi-person"></i>
-          </button>
-
-          {showProfileMenu && (
-          <div className="profile-dropdown-card">
-            <button className="dropdown-item">Profile</button>
-            <button className="dropdown-item">About KapeBara</button>
-            <button className="dropdown-item danger" onClick={handleLogout}>
-              Log Out
+            <button
+              className="icon-btn"
+                on Click={() => setShowProfileMenu(!showProfileMenu)}
+                aria-label="Profile">
+              <i className="bi bi-person"></i>
             </button>
-            </div>
+
+            {showProfileMenu && (
+              <div className="profile-dropdown-card">
+                <button className="dropdown-item">Profile</button>
+                <button className="dropdown-item">About KapeBara</button>
+                <button className="dropdown-item danger" onClick={handleLogout}>
+                  Log Out
+                </button>
+              </div>
             )}
           </div>
-
+        
         <button
           className="icon-btn mobile-menu-btn"
             onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -86,20 +82,15 @@ const Navbar = () => {
         </button>
 
         {showMobileMenu && (
-        <div className="kapebara-mobile-menu">
-          <Link to="/admin/dashboard" className="nav-link">Dashboard</Link>
-          <Link to="/admin/riders" className="nav-link">Riders</Link>
-          <Link to="/admin/deliveries" className="nav-link">Deliveries</Link>
-          <Link to="/admin/history" className="nav-link">History</Link>
-        </div>
-      )}
-
-
-
- 
-
-
-        </div>
+          <div className="kapebara-mobile-menu">
+            <Link to="/admin/dashboard" className="nav-link">Dashboard</Link>
+            <Link to="/admin/riders" className="nav-link">Riders</Link>
+            <Link to="/admin/deliveries" className="nav-link">Deliveries</Link>
+            <Link to="/admin/history" className="nav-link">History</Link>
+          </div>
+        )}
+        
+      </div>
     </nav>
   );
 };
