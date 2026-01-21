@@ -1,9 +1,3 @@
-/*
- * UnifiedService Architecture - Auth Service Implementation
- * 
- * Part of UnifiedService on port 5000.
- * Handles user authentication and authorization.
- */
 using Microsoft.EntityFrameworkCore;
 using AuthService.Data;
 using AuthService.Models;
@@ -45,10 +39,6 @@ public class AuthService : IAuthService
                 .FirstOrDefaultAsync(u =>
                     u.Username == identifier || u.Email == identifier);
 
-            _logger.LogInformation("Login lookup for {Identifier}: user {UserStatus}",
-                identifier,
-                user == null ? "NOT FOUND" : "FOUND");
-
             if (user == null)
             {
                 _logger.LogWarning("Login attempt with invalid username: {Username}", request.Username);
@@ -61,11 +51,9 @@ public class AuthService : IAuthService
                 return null;
             }
 
-            // Verify password using BCrypt
-            var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-            _logger.LogInformation("Password verification for {Identifier}: {PasswordStatus}",
-                identifier,
-                passwordValid ? "PASSED" : "FAILED");
+            // Verify password using BCrypt - trim hash to remove any accidental padding
+            var storedHash = user.PasswordHash?.Trim();
+            var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, storedHash);
 
             if (!passwordValid)
             {
@@ -78,7 +66,7 @@ public class AuthService : IAuthService
 
             // Generate refresh token
             var refreshToken = _tokenService.GenerateRefreshToken();
-            var refreshTokenExpiry = DateTime.UtcNow.AddDays(7); // Refresh token valid for 7 days
+            var refreshTokenExpiry = DateTime.UtcNow.AddDays(7);
 
             // Save refresh token
             var refreshTokenEntity = new RefreshToken

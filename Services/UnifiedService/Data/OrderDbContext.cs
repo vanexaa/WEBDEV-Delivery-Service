@@ -1,9 +1,3 @@
-/*
- * UnifiedService Architecture - Order DbContext
- * 
- * Part of UnifiedService on port 5000.
- * Each domain maintains its own database (OrderServiceDB) for separation of concerns.
- */
 using Microsoft.EntityFrameworkCore;
 using OrderService.Models;
 
@@ -15,7 +9,7 @@ public class OrderDbContext : DbContext
     {
     }
 
-    public DbSet<Order> Orders { get; set; }
+    public DbSet<Order> Orders { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,10 +19,14 @@ public class OrderDbContext : DbContext
         {
             entity.ToTable("Orders", "dbo");
             entity.HasKey(e => e.OrderId);
+            
             entity.Property(e => e.CustomerName).IsRequired().HasMaxLength(255);
             entity.Property(e => e.CustomerPhone).IsRequired().HasMaxLength(50);
             entity.Property(e => e.DeliveryAddress).IsRequired().HasMaxLength(500);
             entity.Property(e => e.Status).HasMaxLength(50);
+
+            // This fixes the decimal warning
+            entity.Property(e => e.OrderTotal).HasColumnType("decimal(18,2)");
         });
     }
 }
