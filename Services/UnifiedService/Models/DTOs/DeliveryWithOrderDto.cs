@@ -9,7 +9,7 @@ public class DeliveryWithOrderDto
     public int OrderId { get; set; }
     public int? RiderId { get; set; }
     public string Status { get; set; } = string.Empty;
-    public DateTime AssignedAt { get; set; }
+    public DateTime? AssignedAt { get; set; }
     public DateTime? AcceptedAt { get; set; }
     public DateTime? PickedUpAt { get; set; }
     public DateTime? DeliveredAt { get; set; }

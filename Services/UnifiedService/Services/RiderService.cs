@@ -1,21 +1,25 @@
 /*
- * UnifiedService Architecture - Rider Service Implementation
+ * Database-First Architecture - Rider Service Implementation
  * 
- * Part of UnifiedService on port 5000.
- * Handles rider profiles, availability, earnings, and feedback.
+ * ARCHITECTURAL RULES ENFORCED:
+ * - ALL data access through stored procedures only
+ * - NO LINQ queries against DbSets
+ * - NO Add/Update/Remove/SaveChanges (except via SP wrappers)
+ * - Service layer only executes SPs and interprets results
  */
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using RiderService.Data;
 using RiderService.Models;
 using RiderService.Models.DTOs;
 using DeliveryService.Data;
 using OrderService.Data;
+using System.Text.Json;
 
 namespace RiderService.Services;
 
 /// <summary>
 /// Service for managing rider operations including profile, availability, orders, earnings, and feedback.
+/// All data access through stored procedures only.
 /// </summary>
 public class RiderService : IRiderService
 {
@@ -36,30 +40,27 @@ public class RiderService : IRiderService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// Get all riders via sp_Rider_GetAll stored procedure.
+    /// </summary>
     public async Task<List<Rider>> GetAllRidersAsync()
     {
-        return await _context.Riders
-            .OrderBy(r => r.FullName)
-            .ToListAsync();
+        return await _context.SpRiderGetAllAsync();
     }
 
+    /// <summary>
+    /// Get all riders with availability via stored procedures.
+    /// </summary>
     public async Task<List<RiderWithAvailabilityDto>> GetAllRidersWithAvailabilityAsync()
     {
         try
         {
-            var riders = await _context.Riders
-                .OrderBy(r => r.FullName)
-                .AsNoTracking()
-                .ToListAsync();
-
-            var availabilityList = await _context.RiderAvailability
-                .AsNoTracking()
-                .ToListAsync();
+            var riders = await _context.SpRiderGetAllAsync();
 
             var result = new List<RiderWithAvailabilityDto>();
             foreach (var rider in riders)
             {
-                var availability = availabilityList.FirstOrDefault(a => a.RiderId == rider.RiderId);
+                var availability = await _context.SpRiderGetAvailabilityAsync(rider.RiderId);
                 result.Add(new RiderWithAvailabilityDto
                 {
                     RiderId = rider.RiderId,
@@ -86,16 +87,25 @@ public class RiderService : IRiderService
         }
     }
 
+    /// <summary>
+    /// Get rider by ID via sp_Rider_GetById stored procedure.
+    /// </summary>
     public async Task<Rider?> GetRiderByIdAsync(int riderId)
     {
-        return await _context.Riders.FindAsync(riderId);
+        return await _context.SpRiderGetByIdAsync(riderId);
     }
 
+    /// <summary>
+    /// Get rider by User ID via sp_Rider_GetByUserId stored procedure.
+    /// </summary>
     public async Task<Rider?> GetRiderByUserIdAsync(int userId)
     {
-        return await _context.Riders.FirstOrDefaultAsync(r => r.UserId == userId);
+        return await _context.SpRiderGetByUserIdAsync(userId);
     }
 
+    /// <summary>
+    /// Get rider availability via sp_Rider_GetAvailability stored procedure.
+    /// </summary>
     public async Task<RiderAvailability?> GetRiderAvailabilityAsync(int riderId)
     {
         try
@@ -108,8 +118,7 @@ public class RiderService : IRiderService
                 return null;
             }
 
-            var availability = await _context.RiderAvailability
-                .FirstOrDefaultAsync(a => a.RiderId == riderId);
+            var availability = await _context.SpRiderGetAvailabilityAsync(riderId);
             
             if (availability == null)
             {
@@ -130,6 +139,9 @@ public class RiderService : IRiderService
         }
     }
 
+    /// <summary>
+    /// Update rider availability via sp_Rider_SetOnlineStatus stored procedure.
+    /// </summary>
     public async Task<RiderAvailability?> UpdateRiderAvailabilityAsync(int riderId, UpdateAvailabilityRequest request)
     {
         if (request == null)
@@ -149,51 +161,25 @@ public class RiderService : IRiderService
                 riderId, request.IsOnline);
 
             // Verify rider exists
-            var rider = await _context.Riders.FindAsync(riderId);
+            var rider = await _context.SpRiderGetByIdAsync(riderId);
             if (rider == null)
             {
                 _logger.LogWarning("Rider not found for RiderId={RiderId}", riderId);
                 return null;
             }
 
-            var availability = await _context.RiderAvailability
-                .FirstOrDefaultAsync(a => a.RiderId == riderId);
+            // Update via stored procedure
+            var (availability, resultCode, resultMessage) = await _context.SpRiderSetOnlineStatusAsync(
+                riderId, request.IsOnline, request.Latitude, request.Longitude);
 
-            if (availability == null)
+            if (resultCode != 0 && availability == null)
             {
-                // Create new availability record
-                _logger.LogInformation("Creating new availability record for RiderId={RiderId}", riderId);
-                availability = new RiderAvailability
-                {
-                    RiderId = riderId,
-                    IsOnline = request.IsOnline,
-                    CurrentLatitude = request.Latitude,
-                    CurrentLongitude = request.Longitude,
-                    LastSeen = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                _context.RiderAvailability.Add(availability);
+                _logger.LogWarning("Failed to update availability: {ResultMessage}", resultMessage);
+                return null;
             }
-            else
-            {
-                // Update existing availability record
-                _logger.LogInformation("Updating existing availability record for RiderId={RiderId}, OldStatus={OldStatus}, NewStatus={NewStatus}", 
-                    riderId, availability.IsOnline, request.IsOnline);
-                
-                availability.IsOnline = request.IsOnline;
-                if (request.Latitude.HasValue && request.Longitude.HasValue)
-                {
-                    availability.CurrentLatitude = request.Latitude.Value;
-                    availability.CurrentLongitude = request.Longitude.Value;
-                }
-                availability.LastSeen = DateTime.UtcNow;
-                availability.UpdatedAt = DateTime.UtcNow;
-            }
-
-            await _context.SaveChangesAsync();
             
             _logger.LogInformation("Rider availability updated successfully: RiderId={RiderId}, IsOnline={IsOnline}",
-                riderId, availability.IsOnline);
+                riderId, availability?.IsOnline);
             
             return availability;
         }
@@ -204,6 +190,10 @@ public class RiderService : IRiderService
         }
     }
 
+    /// <summary>
+    /// Get rider orders via stored procedures.
+    /// Uses sp_Delivery_GetActiveByRiderId and sp_Order_GetById.
+    /// </summary>
     public async Task<List<RiderOrderDto>> GetRiderOrdersAsync(int riderId)
     {
         try
@@ -216,75 +206,24 @@ public class RiderService : IRiderService
                 return new List<RiderOrderDto>();
             }
             
-            // Active delivery statuses - include "Assigned" so riders can see orders they need to accept
-            var activeStatuses = new[] { "Assigned", "Accepted", "PickedUp", "InTransit" };
-            
-            // Get active deliveries for this rider from DeliveryServiceDB
-            // Important: Filter by RiderId to ensure rider only sees their assigned orders
-            var deliveries = await _deliveryContext.Deliveries
-                .Where(d => d.RiderId.HasValue && d.RiderId.Value == riderId && activeStatuses.Contains(d.Status))
-                .OrderByDescending(d => d.AssignedAt)
-                .AsNoTracking()
-                .ToListAsync();
+            // Get active deliveries for this rider via stored procedure
+            var deliveries = await _deliveryContext.SpDeliveryGetActiveByRiderIdAsync(riderId);
 
             _logger.LogInformation("Found {Count} active deliveries for RiderId={RiderId}. Statuses: {Statuses}", 
                 deliveries.Count, riderId, string.Join(", ", deliveries.Select(d => d.Status)));
 
             if (!deliveries.Any())
             {
-                _logger.LogInformation("No active orders found for RiderId={RiderId}. Checking all deliveries...", riderId);
-                
-                // Debug: Check if there are any deliveries at all for this rider (any status)
-                var allDeliveriesForRider = await _deliveryContext.Deliveries
-                    .Where(d => d.RiderId.HasValue && d.RiderId.Value == riderId)
-                    .AsNoTracking()
-                    .ToListAsync();
-                    
-                _logger.LogInformation("Total deliveries for RiderId={RiderId} (any status): {Count}. Statuses: {Statuses}",
-                    riderId, allDeliveriesForRider.Count, 
-                    string.Join(", ", allDeliveriesForRider.Select(d => $"{d.DeliveryId}:{d.Status}")));
-                
-                // Also check for deliveries with "Pending" status that are assigned to this rider
-                // These might be orders waiting for rider acceptance
-                var pendingDeliveries = await _deliveryContext.Deliveries
-                    .Where(d => d.RiderId.HasValue && d.RiderId.Value == riderId && d.Status == "Pending")
-                    .AsNoTracking()
-                    .ToListAsync();
-                
-                if (pendingDeliveries.Any())
-                {
-                    _logger.LogWarning("Found {Count} deliveries with 'Pending' status for RiderId={RiderId}. These should have status 'Assigned' to be visible.",
-                        pendingDeliveries.Count, riderId);
-                }
-                
-                // Check for orders that are pending but don't have deliveries
-                var pendingOrders = await _orderContext.Orders
-                    .Where(o => o.Status == "Pending")
-                    .AsNoTracking()
-                    .ToListAsync();
-                
-                _logger.LogInformation("Found {Count} orders with 'Pending' status in OrderServiceDB (may not be assigned yet). OrderIds: {OrderIds}",
-                    pendingOrders.Count, string.Join(", ", pendingOrders.Select(o => o.OrderId)));
-                
+                _logger.LogInformation("No active orders found for RiderId={RiderId}", riderId);
                 return new List<RiderOrderDto>();
             }
-
-            // Get order IDs from deliveries
-            var orderIds = deliveries.Select(d => d.OrderId).ToList();
-
-            // Fetch order details from OrderServiceDB
-            var orders = await _orderContext.Orders
-                .Where(o => orderIds.Contains(o.OrderId))
-                .AsNoTracking()
-                .ToListAsync();
-
-            _logger.LogInformation("Fetched {Count} orders from OrderServiceDB for RiderId={RiderId}", orders.Count, riderId);
 
             // Map deliveries to RiderOrderDto with order information
             var riderOrders = new List<RiderOrderDto>();
             foreach (var delivery in deliveries)
             {
-                var order = orders.FirstOrDefault(o => o.OrderId == delivery.OrderId);
+                // Fetch order details via stored procedure
+                var order = await _orderContext.SpOrderGetByIdAsync(delivery.OrderId);
                 if (order != null)
                 {
                     riderOrders.Add(new RiderOrderDto
@@ -320,35 +259,25 @@ public class RiderService : IRiderService
         }
     }
 
+    /// <summary>
+    /// Get rider earnings via sp_Rider_GetEarnings stored procedure.
+    /// </summary>
     public async Task<List<RiderEarning>> GetRiderEarningsAsync(int riderId, DateTime? startDate = null, DateTime? endDate = null)
     {
-        var query = _context.RiderEarnings
-            .Where(e => e.RiderId == riderId)
-            .AsQueryable();
-
-        if (startDate.HasValue)
-        {
-            query = query.Where(e => e.EarningDate >= startDate.Value);
-        }
-
-        if (endDate.HasValue)
-        {
-            query = query.Where(e => e.EarningDate <= endDate.Value);
-        }
-
-        return await query
-            .OrderByDescending(e => e.EarningDate)
-            .ToListAsync();
+        return await _context.SpRiderGetEarningsAsync(riderId, startDate, endDate);
     }
 
+    /// <summary>
+    /// Get rider feedback via sp_Rider_GetFeedback stored procedure.
+    /// </summary>
     public async Task<List<RiderFeedback>> GetRiderFeedbackAsync(int riderId)
     {
-        return await _context.RiderFeedback
-            .Where(f => f.RiderId == riderId)
-            .OrderByDescending(f => f.CreatedAt)
-            .ToListAsync();
+        return await _context.SpRiderGetFeedbackAsync(riderId);
     }
 
+    /// <summary>
+    /// Get rider profile via stored procedures.
+    /// </summary>
     public async Task<RiderProfileDto?> GetRiderProfileAsync(int riderId)
     {
         try
@@ -361,7 +290,7 @@ public class RiderService : IRiderService
                 return null;
             }
 
-            var rider = await _context.Riders.FindAsync(riderId);
+            var rider = await _context.SpRiderGetByIdAsync(riderId);
             if (rider == null)
             {
                 _logger.LogWarning("Rider not found in database for RiderId={RiderId}", riderId);
@@ -371,12 +300,9 @@ public class RiderService : IRiderService
             _logger.LogInformation("Rider found: RiderId={RiderId}, FullName={FullName}", rider.RiderId, rider.FullName);
 
             var availability = await GetRiderAvailabilityAsync(riderId);
-            var earnings = await _context.RiderEarnings
-                .Where(e => e.RiderId == riderId && e.Status == "Paid")
-                .ToListAsync();
-            var feedback = await _context.RiderFeedback
-                .Where(f => f.RiderId == riderId)
-                .ToListAsync();
+            var earnings = await _context.SpRiderGetEarningsAsync(riderId);
+            var paidEarnings = earnings.Where(e => e.Status == "Paid").ToList();
+            var feedback = await _context.SpRiderGetFeedbackAsync(riderId);
 
             var profile = new RiderProfileDto
             {
@@ -387,8 +313,8 @@ public class RiderService : IRiderService
                 VehicleType = rider.VehicleType,
                 VehicleNumber = rider.VehicleNumber,
                 IsOnline = availability?.IsOnline ?? false,
-                TotalEarnings = earnings.Any() ? earnings.Sum(e => e.Amount) : 0,
-                TotalDeliveries = earnings.Count,
+                TotalEarnings = paidEarnings.Any() ? paidEarnings.Sum(e => e.Amount) : 0,
+                TotalDeliveries = paidEarnings.Count,
                 AverageRating = feedback.Any() ? feedback.Average(f => f.Rating) : 0
             };
 
@@ -404,33 +330,32 @@ public class RiderService : IRiderService
         }
     }
 
+    /// <summary>
+    /// Get rider delivery history via stored procedures.
+    /// Uses sp_Delivery_GetByRiderId and sp_Order_GetById.
+    /// </summary>
     public async Task<List<RiderOrderDto>> GetRiderDeliveryHistoryAsync(int riderId, DateTime? startDate = null, DateTime? endDate = null)
     {
         try
         {
             _logger.LogInformation("GetRiderDeliveryHistoryAsync called for RiderId={RiderId}", riderId);
             
-            // Get all deliveries for this rider (including completed ones)
-            // Important: Filter by RiderId to ensure rider only sees their deliveries
-            var query = _deliveryContext.Deliveries
-                .Where(d => d.RiderId.HasValue && d.RiderId.Value == riderId)
-                .AsQueryable();
+            // Get all deliveries for this rider via stored procedure
+            var deliveries = await _deliveryContext.SpDeliveryGetByRiderIdAsync(riderId);
 
-            // Filter by date range if provided
+            // Filter by date range if provided (in memory since SP may not support date filtering)
             if (startDate.HasValue)
             {
-                query = query.Where(d => d.CreatedAt >= startDate.Value);
+                deliveries = deliveries.Where(d => d.CreatedAt >= startDate.Value).ToList();
             }
 
             if (endDate.HasValue)
             {
-                query = query.Where(d => d.CreatedAt <= endDate.Value);
+                deliveries = deliveries.Where(d => d.CreatedAt <= endDate.Value).ToList();
             }
 
-            var deliveries = await query
-                .OrderByDescending(d => d.CreatedAt)
-                .AsNoTracking()
-                .ToListAsync();
+            // Sort by CreatedAt descending
+            deliveries = deliveries.OrderByDescending(d => d.CreatedAt).ToList();
 
             _logger.LogInformation("Found {Count} deliveries for RiderId={RiderId} in history query", deliveries.Count, riderId);
 
@@ -440,24 +365,12 @@ public class RiderService : IRiderService
                 return new List<RiderOrderDto>();
             }
 
-            // Get order IDs from deliveries
-            var orderIds = deliveries.Select(d => d.OrderId).Distinct().ToList();
-            _logger.LogInformation("Fetching order details for {Count} orders from OrderServiceDB for RiderId={RiderId}", 
-                orderIds.Count, riderId);
-
-            // Fetch order details from OrderServiceDB
-            var orders = await _orderContext.Orders
-                .Where(o => orderIds.Contains(o.OrderId))
-                .AsNoTracking()
-                .ToListAsync();
-
-            _logger.LogInformation("Retrieved {Count} orders from OrderServiceDB for RiderId={RiderId}", orders.Count, riderId);
-
             // Map deliveries to RiderOrderDto with order information
             var deliveryHistory = new List<RiderOrderDto>();
             foreach (var delivery in deliveries)
             {
-                var order = orders.FirstOrDefault(o => o.OrderId == delivery.OrderId);
+                // Fetch order details via stored procedure
+                var order = await _orderContext.SpOrderGetByIdAsync(delivery.OrderId);
                 if (order != null)
                 {
                     deliveryHistory.Add(new RiderOrderDto

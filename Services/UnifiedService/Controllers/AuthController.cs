@@ -137,13 +137,17 @@ public class AuthController : ControllerBase
                 return Unauthorized(new { message = "Token is required" });
             }
 
-            var principal = _tokenService.ValidateToken(token);
-            if (principal == null)
+            var result = _tokenService.ValidateTokenWithDetails(token);
+            if (!result.IsValid)
             {
-                return Unauthorized(new { message = "Invalid or expired token" });
+                if (result.IsExpired)
+                {
+                    return Unauthorized(new { message = result.ErrorMessage, isExpired = true });
+                }
+                return Unauthorized(new { message = result.ErrorMessage ?? "Invalid token" });
             }
 
-            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = result.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
             {
                 return Unauthorized(new { message = "Invalid token claims" });
@@ -171,7 +175,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Validate JWT token
+    /// Validate JWT token with detailed error information
     /// </summary>
     [HttpGet("validate")]
     public ActionResult ValidateToken()
@@ -184,15 +188,19 @@ public class AuthController : ControllerBase
                 return Ok(new { isValid = false, message = "Token is required" });
             }
 
-            var principal = _tokenService.ValidateToken(token);
-            if (principal == null)
+            var result = _tokenService.ValidateTokenWithDetails(token);
+            if (!result.IsValid)
             {
-                return Ok(new { isValid = false, message = "Invalid or expired token" });
+                return Ok(new { 
+                    isValid = false, 
+                    message = result.ErrorMessage ?? "Invalid token",
+                    isExpired = result.IsExpired
+                });
             }
 
-            var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var username = principal.FindFirst(ClaimTypes.Name)?.Value;
-            var role = principal.FindFirst(ClaimTypes.Role)?.Value;
+            var userId = result.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var username = result.Principal?.FindFirst(ClaimTypes.Name)?.Value;
+            var role = result.Principal?.FindFirst(ClaimTypes.Role)?.Value;
 
             return Ok(new
             {

@@ -1,24 +1,24 @@
 /*
- * UnifiedService Architecture - Auth Service Implementation
+ * Database-First Architecture - Auth Service Implementation
  * 
- * Part of UnifiedService on port 5000.
- * Handles user authentication and authorization.
+ * ARCHITECTURAL RULES ENFORCED:
+ * - ALL data access through stored procedures only
+ * - NO LINQ queries against DbSets
+ * - NO Add/Update/Remove/SaveChanges (except via SP wrappers)
+ * - Service layer only executes SPs and interprets results
  */
-using Microsoft.EntityFrameworkCore;
 using AuthService.Data;
 using AuthService.Models;
 using BCrypt.Net;
-using System.IO;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
 
 namespace AuthService.Services;
 
+/// <summary>
+/// Auth service - executes stored procedures for authentication operations.
+/// All business rules (user validation, token management) enforced by database.
+/// </summary>
 public class AuthService : IAuthService
 {
-    private static readonly HttpClient LogClient = new HttpClient();
-    private const string LogEndpoint = "http://127.0.0.1:7243/ingest/6277f6d4-cb92-42c5-ab86-65314cd70192";
     private readonly AuthDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly IConfiguration _configuration;
@@ -36,6 +36,10 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Login user via sp_Auth_Login stored procedure.
+    /// Password verification done in service layer (BCrypt).
+    /// </summary>
     public async Task<LoginResponse?> LoginAsync(LoginRequest request)
     {
         try
@@ -44,52 +48,15 @@ public class AuthService : IAuthService
             if (string.IsNullOrWhiteSpace(identifier))
             {
                 _logger.LogWarning("Login attempt with empty username/email identifier");
-                #region agent log
-                WriteDebugLog(
-                    "H1",
-                    "AuthService.cs:LoginAsync:missing-identifier",
-                    "Login attempt missing identifier",
-                    new { hasIdentifier = false });
-                #endregion
                 return null;
             }
 
-            #region agent log
-            // H1: Capture exact username being searched
-            var totalUserCount = await _context.Users.CountAsync();
-            var allUsernames = await _context.Users.Select(u => u.Username).ToListAsync();
-            WriteDebugLog(
-                "H1",
-                "AuthService.cs:LoginAsync:entry",
-                "Login attempt received",
-                new { 
-                    identifierLength = identifier.Length,
-                    identifierValue = identifier,
-                    totalUserCount,
-                    existingUsernames = string.Join(",", allUsernames)
-                });
-            #endregion
-
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u =>
-                    u.Username == identifier || u.Email == identifier);
+            // Get user via stored procedure
+            var user = await _context.SpAuthLoginAsync(identifier);
 
             _logger.LogInformation("Login lookup for {Identifier}: user {UserStatus}",
                 identifier,
                 user == null ? "NOT FOUND" : "FOUND");
-
-            #region agent log
-            WriteDebugLog(
-                "H2",
-                "AuthService.cs:LoginAsync:user-lookup",
-                "User lookup result",
-                new { 
-                    userFound = user != null, 
-                    isActive = user?.IsActive,
-                    searchedFor = identifier,
-                    foundUserId = user?.UserId
-                });
-            #endregion
 
             if (user == null)
             {
@@ -100,29 +67,14 @@ public class AuthService : IAuthService
             if (!user.IsActive)
             {
                 _logger.LogWarning("Login attempt for inactive user: {Username}", user.Username);
-                #region agent log
-                WriteDebugLog(
-                    "H2",
-                    "AuthService.cs:LoginAsync:inactive",
-                    "User is inactive",
-                    new { userId = user.UserId });
-                #endregion
                 return null;
             }
 
-            // Verify password using BCrypt
+            // Verify password using BCrypt (done in service layer, not DB)
             var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
             _logger.LogInformation("Password verification for {Identifier}: {PasswordStatus}",
                 identifier,
                 passwordValid ? "PASSED" : "FAILED");
-
-            #region agent log
-            WriteDebugLog(
-                "H3",
-                "AuthService.cs:LoginAsync:password-check",
-                "Password verification result",
-                new { passwordValid, userId = user.UserId });
-            #endregion
 
             if (!passwordValid)
             {
@@ -137,17 +89,8 @@ public class AuthService : IAuthService
             var refreshToken = _tokenService.GenerateRefreshToken();
             var refreshTokenExpiry = DateTime.UtcNow.AddDays(7); // Refresh token valid for 7 days
 
-            // Save refresh token
-            var refreshTokenEntity = new RefreshToken
-            {
-                UserId = user.UserId,
-                Token = refreshToken,
-                ExpiresAt = refreshTokenExpiry,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.RefreshTokens.Add(refreshTokenEntity);
-            await _context.SaveChangesAsync();
+            // Save refresh token via stored procedure
+            await _context.SpAuthSaveRefreshTokenAsync(user.UserId, refreshToken, refreshTokenExpiry);
 
             // Calculate token expiry
             var jwtSettings = _configuration.GetSection("JwtSettings");
@@ -173,76 +116,23 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during login for username: {Username}", request.Username);
-            #region agent log
-            WriteDebugLog(
-                "H4",
-                "AuthService.cs:LoginAsync:exception",
-                "Login exception",
-                new { exceptionType = ex.GetType().Name });
-            #endregion
             return null;
         }
     }
 
+    /// <summary>
+    /// Get user by ID via sp_Auth_GetUserById stored procedure.
+    /// </summary>
     public async Task<User?> GetUserByIdAsync(int userId)
     {
-        return await _context.Users.FindAsync(userId);
+        return await _context.SpAuthGetUserByIdAsync(userId);
     }
 
+    /// <summary>
+    /// Get user by username via sp_Auth_GetUserByUsername stored procedure.
+    /// </summary>
     public async Task<User?> GetUserByUsernameAsync(string username)
     {
-        return await _context.Users
-            .FirstOrDefaultAsync(u => u.Username == username);
-    }
-
-    private static void WriteDebugLog(string hypothesisId, string location, string message, object data)
-    {
-        try
-        {
-            var payload = new
-            {
-                sessionId = "debug-session",
-                runId = "run1",
-                hypothesisId,
-                location,
-                message,
-                data,
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            };
-            var logPath = @"c:\Users\Ideapad\OneDrive\Desktop\WEBDEV\.cursor\debug.log";
-            var logDir = Path.GetDirectoryName(logPath);
-
-            // Ensure directory exists
-            if (!string.IsNullOrWhiteSpace(logDir) && !Directory.Exists(logDir))
-            {
-                Directory.CreateDirectory(logDir);
-            }
-
-            // Always try file write first
-            File.AppendAllText(logPath, JsonSerializer.Serialize(payload) + Environment.NewLine);
-        }
-        catch
-        {
-            // Fallback to HTTP if file write fails
-            try
-            {
-                var payload = new
-                {
-                    sessionId = "debug-session",
-                    runId = "run1",
-                    hypothesisId,
-                    location,
-                    message,
-                    data,
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-                };
-                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-                _ = LogClient.PostAsync(LogEndpoint, content);
-            }
-            catch
-            {
-                // Swallow logging errors to avoid breaking auth flow.
-            }
-        }
+        return await _context.SpAuthGetUserByUsernameAsync(username);
     }
 }

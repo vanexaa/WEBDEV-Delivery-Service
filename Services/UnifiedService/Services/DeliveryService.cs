@@ -170,6 +170,13 @@ public class DeliveryService : IDeliveryService
     {
         try
         {
+            #region agent log
+            WriteDebugLog(
+                "H5",
+                "DeliveryService.cs:GetActiveDeliveriesAsync:in-memory-filter",
+                "Filtering active deliveries in service layer",
+                new { usesStoredProcedure = true, filtersInMemory = true });
+            #endregion
             var allDeliveries = await _context.SpDeliveryGetAllAsync();
             var activeStatuses = new[] { "Assigned", "Accepted", "PickedUp", "InTransit" };
             return allDeliveries.Where(d => activeStatuses.Contains(d.Status)).ToList();

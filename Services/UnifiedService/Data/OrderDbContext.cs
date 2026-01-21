@@ -1,8 +1,11 @@
 /*
- * UnifiedService Architecture - Order DbContext
+ * Database-First Architecture - Order DbContext
  * 
- * Part of UnifiedService on port 5000.
- * Each domain maintains its own database (OrderServiceDB) for separation of concerns.
+ * ARCHITECTURAL RULES ENFORCED:
+ * - ALL data access through stored procedures only
+ * - DbSet properties kept for EF Core SP result mapping only
+ * - NO LINQ queries against DbSets allowed
+ * - NO Add/Update/Remove/SaveChanges (except via SP wrappers)
  */
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -12,12 +15,17 @@ using UnifiedService.Data;
 
 namespace OrderService.Data;
 
+/// <summary>
+/// Order database context - stored procedure execution only.
+/// Connects to OrderServiceDB.
+/// </summary>
 public class OrderDbContext : StoredProcedureDbContext
 {
     public OrderDbContext(DbContextOptions<OrderDbContext> options) : base(options)
     {
     }
 
+    // DbSets kept for SP result mapping only - DO NOT use for LINQ queries
     public DbSet<Order> Orders { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -32,11 +40,15 @@ public class OrderDbContext : StoredProcedureDbContext
             entity.Property(e => e.CustomerPhone).IsRequired().HasMaxLength(50);
             entity.Property(e => e.DeliveryAddress).IsRequired().HasMaxLength(500);
             entity.Property(e => e.Status).HasMaxLength(50);
+            entity.Property(e => e.OrderTotal).HasPrecision(18, 2);
         });
     }
 
     #region Order Stored Procedure Methods
 
+    /// <summary>
+    /// sp_Order_Create: Create new order.
+    /// </summary>
     public async Task<(Order? Order, int ResultCode, string ResultMessage)> SpOrderCreateAsync(
         int customerId,
         string customerName,
@@ -66,11 +78,17 @@ public class OrderDbContext : StoredProcedureDbContext
         return (data.FirstOrDefault(), resultCode, resultMessage);
     }
 
+    /// <summary>
+    /// sp_Order_GetAll: Get all orders.
+    /// </summary>
     public async Task<List<Order>> SpOrderGetAllAsync()
     {
         return await ExecuteSpAsync<Order>("dbo.sp_Order_GetAll");
     }
 
+    /// <summary>
+    /// sp_Order_GetByCustomerId: Get orders for a customer.
+    /// </summary>
     public async Task<List<Order>> SpOrderGetByCustomerIdAsync(int customerId)
     {
         var parameters = new[]
@@ -80,6 +98,9 @@ public class OrderDbContext : StoredProcedureDbContext
         return await ExecuteSpAsync<Order>("dbo.sp_Order_GetByCustomerId", parameters);
     }
 
+    /// <summary>
+    /// sp_Order_GetById: Get order by ID.
+    /// </summary>
     public async Task<Order?> SpOrderGetByIdAsync(int orderId)
     {
         var parameters = new[]
@@ -89,11 +110,17 @@ public class OrderDbContext : StoredProcedureDbContext
         return await ExecuteSpSingleAsync<Order>("dbo.sp_Order_GetById", parameters);
     }
 
+    /// <summary>
+    /// sp_Order_GetPending: Get pending orders.
+    /// </summary>
     public async Task<List<Order>> SpOrderGetPendingAsync()
     {
         return await ExecuteSpAsync<Order>("dbo.sp_Order_GetPending");
     }
 
+    /// <summary>
+    /// sp_Order_UpdateStatus: Update order status.
+    /// </summary>
     public async Task<(Order? Order, int ResultCode, string ResultMessage)> SpOrderUpdateStatusAsync(int orderId, string newStatus)
     {
         var inputParams = new[]

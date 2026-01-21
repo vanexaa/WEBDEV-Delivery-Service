@@ -8,8 +8,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
-using System.IO;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AuthService.Services;
@@ -51,13 +49,6 @@ public class TokenService : ITokenService
         
         _logger.LogInformation("Generated JWT token for UserId={UserId}, Username={Username}, Role={Role}", 
             userId, username, role);
-        #region agent log
-        WriteDebugLog(
-            "H4",
-            "TokenService.cs:GenerateToken",
-            "JWT settings applied for token generation",
-            new { userId, role, issuer, audience, expiryMinutes });
-        #endregion
 
         var token = new JwtSecurityToken(
             issuer: issuer,
@@ -71,6 +62,12 @@ public class TokenService : ITokenService
     }
 
     public ClaimsPrincipal? ValidateToken(string token)
+    {
+        var result = ValidateTokenWithDetails(token);
+        return result.Principal;
+    }
+
+    public TokenValidationResult ValidateTokenWithDetails(string token)
     {
         try
         {
@@ -95,19 +92,63 @@ public class TokenService : ITokenService
             };
 
             var principal = tokenHandler.ValidateToken(token, validationParameters, out SecurityToken validatedToken);
-            return principal;
+            return new TokenValidationResult
+            {
+                IsValid = true,
+                Principal = principal,
+                IsExpired = false
+            };
+        }
+        catch (SecurityTokenExpiredException ex)
+        {
+            _logger.LogWarning("Token expired: ValidTo={ValidTo}, CurrentTime={CurrentTime}", 
+                ex.Expires, DateTime.UtcNow);
+            return new TokenValidationResult
+            {
+                IsValid = false,
+                IsExpired = true,
+                ErrorMessage = "Token has expired. Please login again or use refresh token."
+            };
+        }
+        catch (SecurityTokenInvalidSignatureException)
+        {
+            _logger.LogWarning("Token has invalid signature");
+            return new TokenValidationResult
+            {
+                IsValid = false,
+                IsExpired = false,
+                ErrorMessage = "Token signature is invalid."
+            };
+        }
+        catch (SecurityTokenInvalidIssuerException)
+        {
+            _logger.LogWarning("Token has invalid issuer");
+            return new TokenValidationResult
+            {
+                IsValid = false,
+                IsExpired = false,
+                ErrorMessage = "Token issuer is invalid."
+            };
+        }
+        catch (SecurityTokenInvalidAudienceException)
+        {
+            _logger.LogWarning("Token has invalid audience");
+            return new TokenValidationResult
+            {
+                IsValid = false,
+                IsExpired = false,
+                ErrorMessage = "Token audience is invalid."
+            };
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Token validation failed");
-            #region agent log
-            WriteDebugLog(
-                "H4",
-                "TokenService.cs:ValidateToken:exception",
-                "Token validation failed",
-                new { exceptionType = ex.GetType().Name });
-            #endregion
-            return null;
+            _logger.LogWarning(ex, "Token validation failed: {Message}", ex.Message);
+            return new TokenValidationResult
+            {
+                IsValid = false,
+                IsExpired = false,
+                ErrorMessage = "Token validation failed."
+            };
         }
     }
 
@@ -117,29 +158,5 @@ public class TokenService : ITokenService
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(randomNumber);
         return Convert.ToBase64String(randomNumber);
-    }
-
-    private static void WriteDebugLog(string hypothesisId, string location, string message, object data)
-    {
-        try
-        {
-            var payload = new
-            {
-                sessionId = "debug-session",
-                runId = "run1",
-                hypothesisId,
-                location,
-                message,
-                data,
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            };
-            File.AppendAllText(
-                @"c:\Users\Ideapad\OneDrive\Desktop\WEBDEV\.cursor\debug.log",
-                JsonSerializer.Serialize(payload) + Environment.NewLine);
-        }
-        catch
-        {
-            // Swallow logging errors to avoid breaking auth flow.
-        }
     }
 }
