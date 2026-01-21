@@ -22,6 +22,7 @@ public interface IDeliveryService
     Task<DeliveryTrackingDto?> GetDeliveryTrackingAsync(int orderId);
     Task<List<Delivery>> GetAvailableDeliveriesAsync(int? riderId = null);
     Task<List<DeliveryWithOrderDto>> GetActiveDeliveriesWithOrdersAsync();
+    Task<List<DeliveryWithOrderDto>> GetAllDeliveryHistoryAsync(DateTime? startDate = null, DateTime? endDate = null);
     Task<Delivery?> AcceptDeliveryAsync(int deliveryId, int riderId);
     Task<Delivery?> RejectDeliveryAsync(int deliveryId, int riderId);
 }

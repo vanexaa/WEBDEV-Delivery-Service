@@ -14,6 +14,7 @@ public class DeliveryWithOrderDto
     public DateTime? PickedUpAt { get; set; }
     public DateTime? DeliveredAt { get; set; }
     public DateTime CreatedAt { get; set; }
+    public string? TransactionCode { get; set; } // Generated transaction code (e.g., ORD-{OrderId})
     
     // Order information
     public OrderInfoDto? Order { get; set; }

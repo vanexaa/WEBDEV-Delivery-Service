@@ -417,18 +417,42 @@ public class RiderService : IRiderService
                 .AsQueryable();
 
             // Filter by date range if provided
-            if (startDate.HasValue)
+            // Check multiple date fields: AssignedAt, DeliveredAt, FailedAt, or CreatedAt
+            // This ensures we capture deliveries based on when they were assigned, completed, or created
+            if (startDate.HasValue || endDate.HasValue)
             {
-                query = query.Where(d => d.CreatedAt >= startDate.Value);
-            }
-
-            if (endDate.HasValue)
-            {
-                query = query.Where(d => d.CreatedAt <= endDate.Value);
+                if (startDate.HasValue && endDate.HasValue)
+                {
+                    // Both dates provided - check if any relevant date falls within range
+                    query = query.Where(d => 
+                        (d.AssignedAt >= startDate.Value && d.AssignedAt <= endDate.Value) ||
+                        (d.DeliveredAt.HasValue && d.DeliveredAt >= startDate.Value && d.DeliveredAt <= endDate.Value) ||
+                        (d.FailedAt.HasValue && d.FailedAt >= startDate.Value && d.FailedAt <= endDate.Value) ||
+                        (d.CreatedAt >= startDate.Value && d.CreatedAt <= endDate.Value));
+                }
+                else if (startDate.HasValue)
+                {
+                    // Only start date - check if any relevant date is >= startDate
+                    query = query.Where(d => 
+                        d.AssignedAt >= startDate.Value ||
+                        (d.DeliveredAt.HasValue && d.DeliveredAt >= startDate.Value) ||
+                        (d.FailedAt.HasValue && d.FailedAt >= startDate.Value) ||
+                        d.CreatedAt >= startDate.Value);
+                }
+                else if (endDate.HasValue)
+                {
+                    // Only end date - check if any relevant date is <= endDate
+                    query = query.Where(d => 
+                        d.AssignedAt <= endDate.Value ||
+                        (d.DeliveredAt.HasValue && d.DeliveredAt <= endDate.Value) ||
+                        (d.FailedAt.HasValue && d.FailedAt <= endDate.Value) ||
+                        d.CreatedAt <= endDate.Value);
+                }
             }
 
             var deliveries = await query
-                .OrderByDescending(d => d.CreatedAt)
+                .OrderByDescending(d => d.AssignedAt) // Order by AssignedAt for more relevant ordering
+                .ThenByDescending(d => d.CreatedAt) // Fallback to CreatedAt if AssignedAt is same
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -488,7 +512,9 @@ public class RiderService : IRiderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting rider delivery history for RiderId={RiderId}", riderId);
+            _logger.LogError(ex, "Error getting rider delivery history for RiderId={RiderId}: {Message}", riderId, ex.Message);
+            // Return empty list instead of throwing to prevent frontend errors
+            // The frontend will display "No delivery history found" message
             return new List<RiderOrderDto>();
         }
     }

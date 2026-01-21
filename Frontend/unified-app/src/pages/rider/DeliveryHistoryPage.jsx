@@ -5,6 +5,22 @@ import { riderService } from '../../services/api';
 import RiderNavbar from '../../components/RiderNavbar';
 import '../../App.css';
 
+/**
+ * Rider Dashboard - Delivery History Page
+ * 
+ * DATA FLOW:
+ * Database (seeded mock data) → RiderService → RidersController → Frontend
+ * 
+ * This page fetches delivery history for the logged-in rider from the backend API endpoint:
+ * GET /api/riders/{riderId}/history?startDate={startDate}&endDate={endDate}
+ * 
+ * The backend retrieves data from the database (DeliveryServiceDB and OrderServiceDB),
+ * filtered by the rider's ID. Mock data is seeded into the database on application startup.
+ * 
+ * NOTE: The database mock data can be replaced with real production data
+ * without changing this frontend code.
+ */
+
 const DeliveryHistoryPage = () => {
   const { riderId } = useAuth();
   const [deliveries, setDeliveries] = useState([]);
@@ -12,22 +28,57 @@ const DeliveryHistoryPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dateFilter, setDateFilter] = useState('all'); // today, week, month, all
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
+  // Load data from backend API when riderId or dateFilter changes
   useEffect(() => {
     if (riderId) {
       loadHistory();
     }
   }, [riderId, dateFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Apply search filter whenever deliveries or searchQuery changes
+  useEffect(() => {
+    // Apply search filter whenever deliveries or searchQuery changes
+    if (searchQuery.trim() === '') {
+      setFilteredDeliveries(deliveries);
+    } else {
+      const query = searchQuery.toLowerCase().trim();
+      const filtered = deliveries.filter((delivery) => {
+        const transactionCode = delivery.transactionCode?.toLowerCase() || 
+                               `ORD-${delivery.orderId || delivery.DeliveryId}`.toLowerCase();
+        const customerName = delivery.customerName?.toLowerCase() || 
+                            delivery.order?.customerName?.toLowerCase() || 
+                            delivery.CustomerName?.toLowerCase() || '';
+        const address = delivery.deliveryAddress?.toLowerCase() || 
+                       delivery.order?.deliveryAddress?.toLowerCase() || 
+                       delivery.DeliveryAddress?.toLowerCase() || '';
+        const status = delivery.status?.toLowerCase() || delivery.Status?.toLowerCase() || '';
+        
+        return (
+          transactionCode.includes(query) ||
+          customerName.includes(query) ||
+          address.includes(query) ||
+          status.includes(query)
+        );
+      });
+      setFilteredDeliveries(filtered);
+    }
+  }, [deliveries, searchQuery]);
+
+  /**
+   * Load delivery history from backend API
+   * API Endpoint: GET /api/riders/{riderId}/history
+   * Data comes from database, filtered by riderId
+   */
   const loadHistory = async () => {
     try {
       setLoading(true);
+      setError('');
       console.log('[DeliveryHistoryPage] Loading history for riderId:', riderId);
       
+      // Calculate date range based on filter
       let start = null;
       let end = null;
 
@@ -49,32 +100,42 @@ const DeliveryHistoryPage = () => {
           start.setMonth(today.getMonth() - 1);
           end = new Date();
           break;
-        case 'custom':
-          if (startDate && endDate) {
-            start = new Date(startDate);
-            end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-          }
-          break;
+        case 'all':
         default:
+          // No date filter - fetch all history
+          start = null;
+          end = null;
           break;
       }
 
+      // Fetch from backend API - data comes from database
       const historyData = await riderService.getRiderHistory(riderId, start, end);
-      console.log('[DeliveryHistoryPage] History data received:', historyData);
+      console.log('[DeliveryHistoryPage] History data received from database:', historyData);
+      
+      // Ensure we have an array
+      if (!Array.isArray(historyData)) {
+        console.warn('[DeliveryHistoryPage] History data is not an array:', historyData);
+        setDeliveries([]);
+        setError('');
+        return;
+      }
       
       // Map RiderOrderDto to expected format
-      const mappedDeliveries = (historyData || []).map(delivery => ({
+      const mappedDeliveries = historyData.map(delivery => ({
         deliveryId: delivery.deliveryId || delivery.DeliveryId,
         orderId: delivery.orderId || delivery.OrderId,
         transactionCode: `ORD-${delivery.orderId || delivery.OrderId}`,
         status: delivery.status || delivery.Status,
         assignedAt: delivery.assignedAt || delivery.AssignedAt,
+        deliveredAt: delivery.deliveredAt || delivery.DeliveredAt,
+        customerName: delivery.customerName || delivery.CustomerName,
+        deliveryAddress: delivery.deliveryAddress || delivery.DeliveryAddress,
+        // Keep order structure for compatibility
         order: {
           customerName: delivery.customerName || delivery.CustomerName,
           deliveryAddress: delivery.deliveryAddress || delivery.DeliveryAddress,
           customerPhone: delivery.customerPhone || delivery.CustomerPhone,
-          paymentMethod: 'COD' // Default, could be enhanced
+          paymentMethod: 'Cash on Delivery' // Default, could be enhanced from order data
         }
       }));
       
@@ -82,52 +143,32 @@ const DeliveryHistoryPage = () => {
       setDeliveries(mappedDeliveries);
       setError('');
     } catch (err) {
-      console.error('[DeliveryHistoryPage] Error loading history:', err);
-      setError(err.message || 'Failed to load delivery history');
+      console.error('[DeliveryHistoryPage] Error loading history from backend:', err);
+      setError(err.message || 'Failed to load delivery history from database');
+      setDeliveries([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    // Apply search filter whenever deliveries or searchQuery changes
-    if (searchQuery.trim() === '') {
-      setFilteredDeliveries(deliveries);
-    } else {
-      const query = searchQuery.toLowerCase().trim();
-      const filtered = deliveries.filter((delivery) => {
-        const transactionCode = delivery.transactionCode?.toLowerCase() || '';
-        const customerName = delivery.order?.customerName?.toLowerCase() || '';
-        const address = delivery.order?.deliveryAddress?.toLowerCase() || '';
-        const status = delivery.status?.toLowerCase() || '';
-        
-        return (
-          transactionCode.includes(query) ||
-          customerName.includes(query) ||
-          address.includes(query) ||
-          status.includes(query)
-        );
-      });
-      setFilteredDeliveries(filtered);
-    }
-  }, [deliveries, searchQuery]);
-
-  const handleCustomDateFilter = () => {
-    if (startDate && endDate) {
-      loadHistory();
-    }
-  };
-
+  /**
+   * Handle order click - navigate to order details
+   */
   const handleOrderClick = (transactionCode) => {
     navigate(`/rider/orders/${transactionCode}`);
   };
 
+  /**
+   * Get CSS class for status badge
+   */
   const getStatusBadgeClass = (status) => {
     switch (status) {
+      case 'Completed':
       case 'Delivered':
         return 'bg-success';
       case 'Failed':
         return 'bg-danger';
+      case 'In Progress':
       case 'InTransit':
       case 'PickedUp':
         return 'bg-primary';
@@ -139,8 +180,11 @@ const DeliveryHistoryPage = () => {
     }
   };
 
+  // Calculate summary statistics from database results
   const totalDeliveries = filteredDeliveries.length;
-  const completedDeliveries = filteredDeliveries.filter(d => d.status === 'Delivered').length;
+  const completedDeliveries = filteredDeliveries.filter(d => 
+    d.status === 'Completed' || d.status === 'Delivered'
+  ).length;
 
   return (
     <>
@@ -201,46 +245,14 @@ const DeliveryHistoryPage = () => {
                   value={dateFilter}
                   onChange={(e) => {
                     setDateFilter(e.target.value);
-                    if (e.target.value !== 'custom') {
-                      setStartDate('');
-                      setEndDate('');
-                    }
                   }}
                 >
+                  <option value="all">All Time</option>
                   <option value="today">Today</option>
                   <option value="week">Last 7 Days</option>
                   <option value="month">Last 30 Days</option>
-                  <option value="custom">Custom Range</option>
-                  <option value="all">All Time</option>
                 </select>
               </div>
-              {dateFilter === 'custom' && (
-                <>
-                  <div className="col-md-3 mb-3 mb-md-0">
-                    <label className="form-label">Start Date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-md-3 mb-3 mb-md-0">
-                    <label className="form-label">End Date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-md-2">
-                    <button className="btn btn-primary w-100" onClick={handleCustomDateFilter}>
-                      Apply
-                    </button>
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </div>
@@ -256,6 +268,7 @@ const DeliveryHistoryPage = () => {
                 <div className="spinner-border" role="status">
                   <span className="visually-hidden">Loading...</span>
                 </div>
+                <p className="mt-3 text-muted">Loading delivery history from database...</p>
               </div>
             ) : error ? (
               <div className="alert alert-danger" role="alert">
@@ -263,7 +276,9 @@ const DeliveryHistoryPage = () => {
               </div>
             ) : filteredDeliveries.length === 0 ? (
               <div className="alert alert-info" role="alert">
-                {searchQuery ? 'No deliveries found matching your search.' : 'No delivery history found for the selected period.'}
+                {searchQuery 
+                  ? 'No deliveries found matching your search.' 
+                  : 'No delivery history found for the selected period in database.'}
               </div>
             ) : (
               <div className="table-responsive">
@@ -283,12 +298,16 @@ const DeliveryHistoryPage = () => {
                   <tbody>
                     {filteredDeliveries.map((delivery) => (
                       <tr key={delivery.deliveryId}>
-                        <td>{delivery.transactionCode}</td>
-                        <td>{delivery.order?.customerName || 'N/A'}</td>
+                        <td>
+                          <strong>{delivery.transactionCode}</strong>
+                        </td>
+                        <td>{delivery.customerName || delivery.order?.customerName || 'N/A'}</td>
                         <td>
                           <small>
-                            {delivery.order?.deliveryAddress 
-                              ? delivery.order.deliveryAddress.substring(0, 40) + '...'
+                            {delivery.deliveryAddress || delivery.order?.deliveryAddress
+                              ? ((delivery.deliveryAddress || delivery.order.deliveryAddress).length > 40
+                                  ? (delivery.deliveryAddress || delivery.order.deliveryAddress).substring(0, 40) + '...'
+                                  : (delivery.deliveryAddress || delivery.order.deliveryAddress))
                               : 'N/A'}
                           </small>
                         </td>
@@ -298,18 +317,24 @@ const DeliveryHistoryPage = () => {
                           </span>
                         </td>
                         <td>
-                          {delivery.assignedAt
-                            ? new Date(delivery.assignedAt).toLocaleString()
-                            : 'N/A'}
+                          <small>
+                            {delivery.assignedAt
+                              ? new Date(delivery.assignedAt).toLocaleString()
+                              : 'N/A'}
+                          </small>
                         </td>
                         <td>
-                          {delivery.status === 'Delivered' && delivery.assignedAt
-                            ? new Date(delivery.assignedAt).toLocaleString()
-                            : '-'}
+                          <small>
+                            {delivery.deliveredAt
+                              ? new Date(delivery.deliveredAt).toLocaleString()
+                              : delivery.status === 'Completed' && delivery.assignedAt
+                              ? new Date(delivery.assignedAt).toLocaleString()
+                              : '-'}
+                          </small>
                         </td>
                         <td>
                           <span className={`badge ${delivery.order?.paymentMethod === 'Online Payment' ? 'bg-info' : 'bg-secondary'}`}>
-                            {delivery.order?.paymentMethod || 'N/A'}
+                            {delivery.order?.paymentMethod || 'Cash on Delivery'}
                           </span>
                         </td>
                         <td>

@@ -345,6 +345,102 @@ public class DeliveryService : IDeliveryService
         }
     }
 
+    /// <summary>
+    /// Get all delivery history with order information (for Admin history page)
+    /// </summary>
+    public async Task<List<DeliveryWithOrderDto>> GetAllDeliveryHistoryAsync(DateTime? startDate = null, DateTime? endDate = null)
+    {
+        try
+        {
+            // Get all deliveries (not just active ones)
+            var deliveriesQuery = _context.Deliveries.AsQueryable();
+
+            // Apply date filtering if provided
+            if (startDate.HasValue || endDate.HasValue)
+            {
+                if (startDate.HasValue && endDate.HasValue)
+                {
+                    deliveriesQuery = deliveriesQuery.Where(d => 
+                        (d.AssignedAt >= startDate.Value && d.AssignedAt <= endDate.Value) ||
+                        (d.DeliveredAt.HasValue && d.DeliveredAt >= startDate.Value && d.DeliveredAt <= endDate.Value) ||
+                        (d.FailedAt.HasValue && d.FailedAt >= startDate.Value && d.FailedAt <= endDate.Value));
+                }
+                else if (startDate.HasValue)
+                {
+                    deliveriesQuery = deliveriesQuery.Where(d => 
+                        d.AssignedAt >= startDate.Value ||
+                        (d.DeliveredAt.HasValue && d.DeliveredAt >= startDate.Value) ||
+                        (d.FailedAt.HasValue && d.FailedAt >= startDate.Value));
+                }
+                else if (endDate.HasValue)
+                {
+                    deliveriesQuery = deliveriesQuery.Where(d => 
+                        d.AssignedAt <= endDate.Value ||
+                        (d.DeliveredAt.HasValue && d.DeliveredAt <= endDate.Value) ||
+                        (d.FailedAt.HasValue && d.FailedAt <= endDate.Value));
+                }
+            }
+
+            var deliveries = await deliveriesQuery
+                .OrderByDescending(d => d.AssignedAt)
+                .AsNoTracking()
+                .ToListAsync();
+
+            if (!deliveries.Any())
+            {
+                return new List<DeliveryWithOrderDto>();
+            }
+
+            // Get order IDs
+            var orderIds = deliveries.Select(d => d.OrderId).ToList();
+
+            // Fetch orders from OrderServiceDB
+            var orders = await _orderContext.Orders
+                .Where(o => orderIds.Contains(o.OrderId))
+                .AsNoTracking()
+                .ToListAsync();
+
+            // Map to DTO with order information
+            var result = new List<DeliveryWithOrderDto>();
+            foreach (var delivery in deliveries)
+            {
+                var order = orders.FirstOrDefault(o => o.OrderId == delivery.OrderId);
+                result.Add(new DeliveryWithOrderDto
+                {
+                    DeliveryId = delivery.DeliveryId,
+                    OrderId = delivery.OrderId,
+                    RiderId = delivery.RiderId,
+                    Status = delivery.Status ?? string.Empty,
+                    AssignedAt = delivery.AssignedAt,
+                    AcceptedAt = delivery.AcceptedAt,
+                    PickedUpAt = delivery.PickedUpAt,
+                    DeliveredAt = delivery.DeliveredAt,
+                    CreatedAt = delivery.CreatedAt,
+                    TransactionCode = $"ORD-{delivery.OrderId}", // Generate transaction code
+                    Order = order != null ? new OrderInfoDto
+                    {
+                        OrderId = order.OrderId,
+                        CustomerName = order.CustomerName ?? string.Empty,
+                        CustomerPhone = order.CustomerPhone ?? string.Empty,
+                        DeliveryAddress = order.DeliveryAddress ?? string.Empty,
+                        OrderTotal = order.OrderTotal,
+                        PaymentMethod = order.PaymentMethod ?? string.Empty,
+                        OrderDate = order.OrderDate,
+                        SpecialInstructions = order.SpecialInstructions
+                    } : null
+                });
+            }
+
+            _logger.LogInformation("Retrieved {Count} delivery history records", result.Count);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving all delivery history");
+            throw;
+        }
+    }
+
     public async Task<Delivery?> UpdateDeliveryStatusAsync(int deliveryId, UpdateDeliveryStatusRequest request, int userId)
     {
         if (request == null)
