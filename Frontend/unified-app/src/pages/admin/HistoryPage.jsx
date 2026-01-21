@@ -234,7 +234,7 @@ const HistoryPage = () => {
 
           {/* Summary Cards */}
           <div className="row mb-4">
-            <div className="col-md-3 mb-3">
+            <div className="col-md-4 mb-3">
               <div className="card text-center border-primary">
                 <div className="card-body">
                   <h6 className="text-muted mb-2">Total Deliveries</h6>
@@ -242,7 +242,7 @@ const HistoryPage = () => {
                 </div>
               </div>
             </div>
-            <div className="col-md-3 mb-3">
+            <div className="col-md-4 mb-3">
               <div className="card text-center border-success">
                 <div className="card-body">
                   <h6 className="text-muted mb-2">Completed</h6>
@@ -250,23 +250,11 @@ const HistoryPage = () => {
                 </div>
               </div>
             </div>
-            <div className="col-md-3 mb-3">
+            <div className="col-md-4 mb-3">
               <div className="card text-center border-danger">
                 <div className="card-body">
                   <h6 className="text-muted mb-2">Failed</h6>
                   <h2 className="text-danger mb-0">{failedDeliveries}</h2>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3 mb-3">
-              <div className="card text-center border-info">
-                <div className="card-body">
-                  <h6 className="text-muted mb-2">Success Rate</h6>
-                  <h2 className="text-info mb-0">
-                    {totalDeliveries > 0 
-                      ? Math.round((completedDeliveries / totalDeliveries) * 100) 
-                      : 0}%
-                  </h2>
                 </div>
               </div>
             </div>
