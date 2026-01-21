@@ -21,3 +21,55 @@
   opacity: 0.9;
   margin: 0;
 }
+
+/* ===============================
+   Mobile – Stat Cards
+   =============================== */
+@media (max-width: 576px) {
+  .stat-card h2 {
+    font-size: 1.6rem;
+  }
+
+  .stat-card h5 {
+    font-size: 0.8rem;
+  }
+}
+
+/* ===============================
+   Mobile Tables
+   =============================== */
+@media (max-width: 768px) {
+  .table-responsive {
+    overflow-x: auto;
+  }
+
+  table {
+    font-size: 0.85rem;
+  }
+
+  th, td {
+    white-space: nowrap;
+  }
+
+  .btn-sm {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+}
+
+/* ===============================
+   Mobile Modals
+   =============================== */
+@media (max-width: 576px) {
+  .modal-dialog {
+    margin: 0.75rem;
+  }
+
+  .modal-content {
+    border-radius: 14px;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+}

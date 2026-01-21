@@ -1,0 +1,83 @@
+/* ===============================
+   Kapebara – Order Card
+   =============================== */
+
+.order-card {
+  border-radius: 14px;
+  border: 1px solid rgba(59, 48, 42, 0.08);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Title */
+.order-title {
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #3B302A;
+  margin: 0;
+}
+
+/* Text */
+.order-text {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 0.85rem;
+  color: #1C1C1C;
+  margin-bottom: 6px;
+}
+
+/* Labels */
+.order-label {
+  color: #757575;
+  font-weight: 600;
+}
+
+/* ===============================
+   Status Badges (Brand-aligned)
+   =============================== */
+
+.status-badge {
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Coffee-neutral mapping */
+.status-assigned {
+  background-color: #E6D3B1;
+  color: #3B302A;
+}
+
+.status-accepted {
+  background-color: #D7E2E2;
+  color: #2F4F4F;
+}
+
+.status-pickedup {
+  background-color: #C6A77D;
+  color: #3B302A;
+}
+
+.status-transit {
+  background-color: #8A817C;
+  color: #FFFFFF;
+}
+
+.status-delivered {
+  background-color: #6F7555;
+  color: #FFFFFF;
+}
+
+.status-failed {
+  background-color: #B85C5C;
+  color: #FFFFFF;
+}

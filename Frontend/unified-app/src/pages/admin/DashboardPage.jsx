@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { deliveryService, riderService, orderService } from '../../services/api';
-import Navbar from '../../components/Navbar';
+import Navbar from '../../components/AdminNavbar';
 import '../../App.css';
 
 const AdminDashboardPage = () => {
@@ -348,32 +348,35 @@ const AdminDashboardPage = () => {
       <div className="container-fluid page-container">
       {/* Statistics Cards */}
       <div className="row mb-4">
-        <div className="col-md-3">
-          <div className="card text-white bg-primary stat-card">
+        <div className="col-6 col-md-3 mb-3">
+          <div className="card stat-card stat-primary">
             <div className="card-body">
               <h5 className="card-title">Active Deliveries</h5>
               <h2>{stats.activeDeliveries}</h2>
             </div>
           </div>
         </div>
-        <div className="col-md-3">
-          <div className="card text-white bg-success stat-card">
+
+        <div className="col-6 col-md-3 mb-3">
+          <div className="card stat-card stat-success">
             <div className="card-body">
               <h5 className="card-title">Online Riders</h5>
               <h2>{stats.onlineRiders}</h2>
             </div>
           </div>
         </div>
-        <div className="col-md-3">
-          <div className="card text-white bg-warning stat-card">
+
+        <div className="col-6 col-md-3 mb-3">
+          <div className="card stat-card stat-warning">
             <div className="card-body">
               <h5 className="card-title">Pending Assignments</h5>
               <h2>{stats.pendingAssignments}</h2>
             </div>
           </div>
         </div>
-        <div className="col-md-3">
-          <div className="card text-white bg-info stat-card">
+
+        <div className="col-6 col-md-3 mb-3">
+          <div className="card stat-card stat-info">
             <div className="card-body">
               <h5 className="card-title">Today's Deliveries</h5>
               <h2>{stats.todayDeliveries}</h2>

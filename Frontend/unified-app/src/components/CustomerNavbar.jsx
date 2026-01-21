@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
+import logo from '../assets/logo.png';
+import '../css/CustomerNavbar.css';
 
 const CustomerNavbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuth();
-
+  
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -17,44 +19,53 @@ const CustomerNavbar = () => {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
-      <div className="container-fluid">
-        <Link className="navbar-brand" to="/customer/orders">
-          <i className="bi bi-cart-check"></i> Customer Portal
-        </Link>
-        <button
-          className="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarNav"
+  <nav className="kapebara-navbar">
+    <div className="logo-container" onClick={(e) => navigateTo && navigateTo('dashboard', e)}>
+              <img 
+                src={logo} 
+                alt="Kapebara Admin" 
+                className="logo-img"
+                onError={(e) => {e.target.style.display='none'; e.target.nextSibling.style.display='block'}} 
+              />
+              <span className="logo-text" style={{display: 'none'}}>Kapebara</span>
+            </div>
+
+      {/* CENTER – LINKS */}
+      <div className="kapebara-nav-links">
+        <Link
+          to="/customer/orders"
+          className={`nav-link ${isActive('/customer/orders') ? 'active' : ''}`}
         >
-          <span className="navbar-toggler-icon"></span>
-        </button>
-        <div className="collapse navbar-collapse" id="navbarNav">
-          <ul className="navbar-nav ms-auto">
-            <li className="nav-item">
-              <Link className={`nav-link ${isActive('/customer/orders') ? 'active' : ''}`} to="/customer/orders">
-                <i className="bi bi-list-ul"></i> My Orders
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className={`nav-link ${isActive('/customer/orders-test') ? 'active' : ''}`} to="/customer/orders-test">
-                <i className="bi bi-bag-plus"></i> Create Order
-              </Link>
-            </li>
-            <li className="nav-item">
-              <span className="nav-link">Welcome, {user?.username}</span>
-            </li>
-            <li className="nav-item">
-              <button className="nav-link btn btn-link text-light" onClick={handleLogout}>
-                <i className="bi bi-box-arrow-right"></i> Logout
-              </button>
-            </li>
-          </ul>
-        </div>
+          My Orders
+        </Link>
+
+        <Link
+          to="/customer/orders-test"
+          className={`nav-link ${isActive('/customer/orders-test') ? 'active' : ''}`}
+        >
+          Create Order
+        </Link>
       </div>
-    </nav>
-  );
+
+      {/* RIGHT – USER + LOGOUT */}
+      <div className="kapebara-nav-icons">
+        <span className="user-name hidden-mobile">
+          Hi, {user?.username}
+        </span>
+
+        <button
+          className="icon-btn"
+          onClick={handleLogout}
+          aria-label="Logout"
+        >
+          <i className="bi bi-box-arrow-right"></i>
+        </button>
+      </div>
+
+    
+  </nav>
+);
+
 };
 
 export default CustomerNavbar;
