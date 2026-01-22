@@ -199,15 +199,6 @@ const ProfilePage = () => {
                     ${(profile.totalEarnings || profile.TotalEarnings || 0).toFixed(2)}
                   </p>
                 </div>
-                <div className="mb-3">
-                  <h6 className="text-muted">Average Rating</h6>
-                  <div className="d-flex align-items-center">
-                    <i className="bi bi-star-fill text-warning me-2" style={{ fontSize: '24px' }}></i>
-                    <p className="fs-3 fw-bold mb-0">
-                      {(profile.averageRating || profile.AverageRating || 0).toFixed(1)}
-                    </p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
