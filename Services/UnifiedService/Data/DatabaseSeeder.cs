@@ -127,10 +127,6 @@ public static class DatabaseSeeder
                     OrderId = order.OrderId,
                     RiderId = rider.RiderId,
                     Status = deliveryStatus,
-                    RestaurantLatitude = 40.7128m, // Mock restaurant location
-                    RestaurantLongitude = -74.0060m,
-                    DeliveryLatitude = 40.7580m + (decimal)(random.NextDouble() * 0.1),
-                    DeliveryLongitude = -73.9855m + (decimal)(random.NextDouble() * 0.1),
                     AssignedAt = assignedAt,
                     AcceptedAt = assignedAt.AddMinutes(random.Next(5, 30)),
                     PickedUpAt = assignedAt.AddMinutes(random.Next(30, 60)),
