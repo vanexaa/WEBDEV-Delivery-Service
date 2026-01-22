@@ -533,6 +533,93 @@ public class DeliveryService : IDeliveryService
         }
     }
 
+    /// <summary>
+    /// Get all delivery history via stored procedures.
+    /// Uses sp_Delivery_GetAll and sp_Order_GetById.
+    /// </summary>
+    public async Task<List<DeliveryWithOrderDto>> GetAllDeliveryHistoryAsync(DateTime? startDate = null, DateTime? endDate = null)
+    {
+        try
+        {
+            _logger.LogInformation("GetAllDeliveryHistoryAsync called");
+
+            // Get all deliveries via stored procedure
+            var deliveries = await _context.SpDeliveryGetAllAsync();
+
+            // Filter by date range if provided (in memory since SP may not support date filtering)
+            if (startDate.HasValue)
+            {
+                deliveries = deliveries.Where(d => d.CreatedAt >= startDate.Value).ToList();
+            }
+
+            if (endDate.HasValue)
+            {
+                deliveries = deliveries.Where(d => d.CreatedAt <= endDate.Value).ToList();
+            }
+
+            // Sort by CreatedAt descending
+            deliveries = deliveries.OrderByDescending(d => d.CreatedAt).ToList();
+
+            _logger.LogInformation("Found {Count} deliveries in history query", deliveries.Count);
+
+            if (!deliveries.Any())
+            {
+                _logger.LogInformation("No delivery history found");
+                return new List<DeliveryWithOrderDto>();
+            }
+
+            // Map deliveries to DeliveryWithOrderDto with order information
+            var deliveryHistory = new List<DeliveryWithOrderDto>();
+            foreach (var delivery in deliveries)
+            {
+                // Fetch order details via stored procedure
+                var order = await _orderContext.SpOrderGetByIdAsync(delivery.OrderId);
+                if (order != null)
+                {
+                    deliveryHistory.Add(new DeliveryWithOrderDto
+                    {
+                        DeliveryId = delivery.DeliveryId,
+                        OrderId = delivery.OrderId,
+                        RiderId = delivery.RiderId,
+                        Status = delivery.Status ?? string.Empty,
+                        AssignedAt = delivery.AssignedAt,
+                        AcceptedAt = delivery.AcceptedAt,
+                        PickedUpAt = delivery.PickedUpAt,
+                        DeliveredAt = delivery.DeliveredAt,
+                        CreatedAt = delivery.CreatedAt,
+                        Order = new OrderInfoDto
+                        {
+                            OrderId = order.OrderId,
+                            CustomerName = order.CustomerName ?? string.Empty,
+                            CustomerPhone = order.CustomerPhone ?? string.Empty,
+                            DeliveryAddress = order.DeliveryAddress ?? string.Empty,
+                            OrderTotal = order.OrderTotal,
+                            PaymentMethod = order.PaymentMethod ?? string.Empty,
+                            OrderDate = order.OrderDate,
+                            SpecialInstructions = order.SpecialInstructions
+                        }
+                    });
+                    
+                    _logger.LogDebug("Mapped history delivery: DeliveryId={DeliveryId}, OrderId={OrderId}, Status={Status}",
+                        delivery.DeliveryId, delivery.OrderId, delivery.Status);
+                }
+                else
+                {
+                    _logger.LogWarning("Order not found in OrderServiceDB for DeliveryId={DeliveryId}, OrderId={OrderId}",
+                        delivery.DeliveryId, delivery.OrderId);
+                }
+            }
+
+            _logger.LogInformation("Retrieved {Count} delivery history records", deliveryHistory.Count);
+            return deliveryHistory;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all delivery history");
+            return new List<DeliveryWithOrderDto>();
+        }
+    }
+
     private static void WriteDebugLog(string hypothesisId, string location, string message, object data)
     {
         try

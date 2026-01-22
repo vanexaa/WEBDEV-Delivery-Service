@@ -406,6 +406,24 @@ public class DeliveriesController : ControllerBase
             return StatusCode(500, new { message = "An error occurred" });
         }
     }
+
+    /// <summary>
+    /// Get all delivery history (Admin)
+    /// </summary>
+    [HttpGet("history")]
+    public async Task<ActionResult> GetAllDeliveryHistory([FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+    {
+        try
+        {
+            var deliveryHistory = await _deliveryService.GetAllDeliveryHistoryAsync(startDate, endDate);
+            return Ok(deliveryHistory);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all delivery history");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
 }
 
 /// <summary>

@@ -62,7 +62,12 @@ const HistoryPage = () => {
         riderService.getAllDeliveryHistory(),
         riderService.getAllRiders()
       ]);
-      setAllHistory(historyData || []);
+      // Map data and generate transactionCode if missing
+      const mappedHistory = (historyData || []).map(delivery => ({
+        ...delivery,
+        transactionCode: delivery.transactionCode || `ORD-${delivery.orderId || delivery.OrderId || delivery.deliveryId || delivery.DeliveryId}`
+      }));
+      setAllHistory(mappedHistory);
       setRiders(ridersData || []);
       setError('');
     } catch (err) {

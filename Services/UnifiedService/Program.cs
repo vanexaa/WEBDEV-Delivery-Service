@@ -311,6 +311,19 @@ using (var scope = app.Services.CreateScope())
     {
         logger.LogError(ex, "Error initializing Customer database");
     }
+    
+    // Seed mock delivery history data
+    try
+    {
+        var deliveryContext = services.GetRequiredService<DeliveryDbContext>();
+        var orderContext = services.GetRequiredService<OrderDbContext>();
+        var riderContext = services.GetRequiredService<RiderDbContext>();
+        await DatabaseSeeder.SeedMockDeliveryDataAsync(deliveryContext, orderContext, riderContext, logger);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error seeding delivery history mock data");
+    }
 }
 
 // Configure the HTTP request pipeline
