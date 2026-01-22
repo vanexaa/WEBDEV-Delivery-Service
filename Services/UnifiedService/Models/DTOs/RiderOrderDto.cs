@@ -9,5 +9,5 @@ public class RiderOrderDto
     public string DeliveryAddress { get; set; } = string.Empty;
     public string? SpecialInstructions { get; set; }
     public string Status { get; set; } = string.Empty;
-    public DateTime AssignedAt { get; set; }
+    public DateTime? AssignedAt { get; set; }
 }

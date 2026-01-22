@@ -1,10 +1,14 @@
 /*
- * UnifiedService Architecture - Order Service Implementation
+ * Database-First Architecture - Order Service Implementation
  * 
- * Part of UnifiedService on port 5000.
- * Handles order creation, retrieval, and management.
+ * ARCHITECTURAL RULES ENFORCED:
+ * - ALL data access through stored procedures only
+ * - NO LINQ queries
+ * - NO Add/Update/Remove/SaveChanges
+ * - Business rules come from SP return codes
+ * - Service layer only executes SPs and interprets results
  */
-using Microsoft.EntityFrameworkCore;
+
 using Microsoft.Extensions.Logging;
 using OrderService.Data;
 using OrderService.Models;
@@ -13,28 +17,33 @@ using DeliveryService.Services;
 using DeliveryService.Data;
 using DeliveryService.Models.DTOs;
 using RiderService.Data;
+using System.IO;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 
 namespace OrderService.Services;
 
 /// <summary>
-/// Service for managing order operations including creation, retrieval, and listing.
+/// Order service - executes stored procedures for order operations.
+/// All business rules (validation, status transitions) come from the database.
 /// </summary>
 public class OrderService : IOrderService
 {
+    private static readonly HttpClient LogClient = new HttpClient();
+    private const string LogEndpoint = "http://127.0.0.1:7243/ingest/6277f6d4-cb92-42c5-ab86-65314cd70192";
     private readonly OrderDbContext _context;
     private readonly DeliveryDbContext _deliveryContext;
     private readonly ILogger<OrderService> _logger;
     private readonly IDeliveryService _deliveryService;
     private readonly RiderDbContext _riderContext;
 
-    // Active delivery statuses that indicate an order is already being handled
-    private static readonly HashSet<string> ActiveDeliveryStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "Assigned", "Accepted", "PickedUp", "InTransit"
-    };
-
-    // Constructor with all dependencies (for auto-assignment and pending assignments query)
-    public OrderService(OrderDbContext context, DeliveryDbContext deliveryContext, IDeliveryService deliveryService, RiderDbContext riderContext, ILogger<OrderService> logger)
+    public OrderService(
+        OrderDbContext context, 
+        DeliveryDbContext deliveryContext, 
+        IDeliveryService deliveryService, 
+        RiderDbContext riderContext, 
+        ILogger<OrderService> logger)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _deliveryContext = deliveryContext ?? throw new ArgumentNullException(nameof(deliveryContext));
@@ -43,157 +52,105 @@ public class OrderService : IOrderService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// Create order via sp_Order_Create stored procedure.
+    /// Business rules enforced by database:
+    /// - OrderTotal must be > 0
+    /// - Required fields validated
+    /// - Initial Status = 'Pending'
+    /// </summary>
     public async Task<Order> CreateOrderAsync(CreateOrderRequest request)
     {
-        var now = DateTime.UtcNow;
-        var order = new Order
-        {
-            CustomerId = request.CustomerId,
-            CustomerName = request.CustomerName,
-            CustomerPhone = request.CustomerPhone,
-            DeliveryAddress = request.DeliveryAddress,
-            SpecialInstructions = request.SpecialInstructions,
-            OrderTotal = request.OrderTotal,
-            PaymentMethod = request.PaymentMethod,
-            Status = "Pending",  // Initial status - database is source of truth
-            OrderDate = now,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
+        #region agent log
+        WriteDebugLog(
+            "H2",
+            "OrderService.cs:CreateOrderAsync:entry",
+            "Create order request received",
+            new
+            {
+                customerId = request.CustomerId,
+                hasName = !string.IsNullOrWhiteSpace(request.CustomerName),
+                hasAddress = !string.IsNullOrWhiteSpace(request.DeliveryAddress),
+                orderTotal = request.OrderTotal,
+                paymentMethod = request.PaymentMethod
+            });
+        #endregion
+        var (order, resultCode, resultMessage) = await _context.SpOrderCreateAsync(
+            request.CustomerId,
+            request.CustomerName,
+            request.CustomerPhone,
+            request.DeliveryAddress,
+            request.SpecialInstructions,
+            request.OrderTotal,
+            request.PaymentMethod
+        );
 
-        _context.Orders.Add(order);
-        await _context.SaveChangesAsync();  // Persisted to database immediately
+        if (resultCode != 0 || order == null)
+        {
+            _logger.LogError("Failed to create order: {ResultMessage}", resultMessage);
+            #region agent log
+            WriteDebugLog(
+                "H2",
+                "OrderService.cs:CreateOrderAsync:failed",
+                "Order creation failed",
+                new { resultCode, resultMessage, customerId = request.CustomerId, orderTotal = request.OrderTotal });
+            #endregion
+            throw new InvalidOperationException(resultMessage);
+        }
 
         _logger.LogInformation("✅ Order created: OrderId={OrderId}, CustomerId={CustomerId}, Status={Status}", 
             order.OrderId, order.CustomerId, order.Status);
+        #region agent log
+        WriteDebugLog(
+            "H2",
+            "OrderService.cs:CreateOrderAsync:created",
+            "Order created via SP",
+            new { orderId = order.OrderId, status = order.Status });
+        #endregion
         _logger.LogInformation("📦 Order {OrderId} is now PENDING and will appear in Admin Dashboard 'Pending Assignments'", 
             order.OrderId);
-
-        // NOTE: Auto-assignment is handled by the background service (OrderAssignmentBackgroundService)
-        // which runs every 30 seconds. This ensures orders appear in "Pending Assignments" first,
-        // giving admins visibility before automatic assignment occurs.
-        // 
-        // If you want immediate auto-assignment, uncomment the code below:
-        // try
-        // {
-        //     await AutoAssignOrderToRiderAsync(order.OrderId);
-        // }
-        // catch (Exception ex)
-        // {
-        //     _logger.LogError(ex, "Error auto-assigning order {OrderId} to rider", order.OrderId);
-        // }
 
         return order;
     }
 
     /// <summary>
-    /// Automatically assigns a new order to an available online rider.
-    /// Uses load balancing to assign to the rider with fewest active deliveries.
+    /// Get all orders via sp_Order_GetAll stored procedure.
     /// </summary>
-    private async Task AutoAssignOrderToRiderAsync(int orderId)
-    {
-        try
-        {
-            _logger.LogInformation("Starting auto-assignment for new OrderId={OrderId}", orderId);
-
-            // Find available online riders
-            var onlineRiders = await _riderContext.RiderAvailability
-                .Where(ra => ra.IsOnline == true)
-                .Select(ra => ra.RiderId)
-                .ToListAsync();
-
-            if (!onlineRiders.Any())
-            {
-                _logger.LogInformation("No online riders available for auto-assignment of OrderId={OrderId}. Order will be assigned later by background service.", orderId);
-                return;
-            }
-
-            _logger.LogInformation("Found {Count} online riders for OrderId={OrderId}", onlineRiders.Count, orderId);
-
-            // Load balancing: Get active delivery counts per rider from DeliveryService
-            // We'll use reflection to access DeliveryDbContext if needed, but first try a simpler approach
-            // Get active delivery counts by calling a method on IDeliveryService or directly querying
-            
-            // For now, use simple load balancing: assign to first available rider
-            // The background service will handle more sophisticated load balancing for pending orders
-            // In production, you might want to inject DeliveryDbContext here or create a method in IDeliveryService
-            
-            // Simple assignment to first rider (load balancing done by background service for pending orders)
-            var assignedRiderId = onlineRiders.First();
-            
-            _logger.LogInformation("Auto-assigning new OrderId={OrderId} to RiderId={RiderId}", 
-                orderId, assignedRiderId);
-
-            // Create delivery assignment (AssignDeliveryAsync will create delivery if it doesn't exist)
-            var assignRequest = new AssignDeliveryRequest
-            {
-                OrderId = orderId,
-                RiderId = assignedRiderId
-            };
-
-            var delivery = await _deliveryService.AssignDeliveryAsync(assignRequest);
-            
-            if (delivery != null)
-            {
-                _logger.LogInformation("✅ Order {OrderId} successfully auto-assigned to Rider {RiderId}, DeliveryId={DeliveryId}, Status={Status}", 
-                    orderId, assignedRiderId, delivery.DeliveryId, delivery.Status);
-            }
-            else
-            {
-                _logger.LogWarning("⚠️ Failed to auto-assign OrderId={OrderId} to RiderId={RiderId}. Order will remain pending and be assigned later by background service.", 
-                    orderId, assignedRiderId);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Exception during auto-assignment of OrderId={OrderId}. Order will remain pending and be assigned later by background service.", orderId);
-            // Don't throw - let order remain pending, background service will retry
-        }
-    }
-
     public async Task<List<Order>> GetAllOrdersAsync()
     {
-        return await _context.Orders
-            .OrderByDescending(o => o.OrderDate)
-            .ToListAsync();
-    }
-
-    public async Task<List<Order>> GetOrdersByCustomerIdAsync(int customerId)
-    {
-        return await _context.Orders
-            .Where(o => o.CustomerId == customerId)
-            .OrderByDescending(o => o.OrderDate)
-            .ToListAsync();
-    }
-
-    public async Task<Order?> GetOrderByIdAsync(int orderId)
-    {
-        return await _context.Orders.FindAsync(orderId);
+        return await _context.SpOrderGetAllAsync();
     }
 
     /// <summary>
-    /// Gets orders that are pending assignment (Status = 'Pending' and no active delivery assignment).
-    /// This is the single source of truth for the Admin dashboard "Pending Assignments" section.
-    /// 
-    /// SQL Logic:
-    /// - Orders with Status = 'Pending' in OrderServiceDB
-    /// - These are orders waiting to be assigned to a rider
+    /// Get orders by customer ID via sp_Order_GetByCustomerId stored procedure.
+    /// </summary>
+    public async Task<List<Order>> GetOrdersByCustomerIdAsync(int customerId)
+    {
+        return await _context.SpOrderGetByCustomerIdAsync(customerId);
+    }
+
+    /// <summary>
+    /// Get order by ID via sp_Order_GetById stored procedure.
+    /// </summary>
+    public async Task<Order?> GetOrderByIdAsync(int orderId)
+    {
+        return await _context.SpOrderGetByIdAsync(orderId);
+    }
+
+    /// <summary>
+    /// Get pending orders via sp_Order_GetPending stored procedure.
+    /// Business rule from database: Orders with Status = 'Pending'
     /// </summary>
     public async Task<List<PendingAssignmentDto>> GetPendingAssignmentsAsync()
     {
         try
         {
-            _logger.LogInformation("[GetPendingAssignments] Querying pending assignments from SQL...");
+            _logger.LogInformation("[GetPendingAssignments] Executing sp_Order_GetPending...");
 
-            // Get all orders with Status = 'Pending' from OrderServiceDB
-            // These are orders that need to be assigned to a rider
-            var pendingOrders = await _context.Orders
-                .Where(o => o.Status == "Pending")
-                .OrderBy(o => o.OrderDate) // Oldest first (FIFO)
-                .AsNoTracking()
-                .ToListAsync();
+            // Execute stored procedure - database returns pending orders
+            var pendingOrders = await _context.SpOrderGetPendingAsync();
 
-            _logger.LogInformation("[GetPendingAssignments] Found {Count} orders with Status='Pending' in OrderServiceDB", 
+            _logger.LogInformation("[GetPendingAssignments] Found {Count} pending orders from database", 
                 pendingOrders.Count);
 
             if (!pendingOrders.Any())
@@ -202,7 +159,7 @@ public class OrderService : IOrderService
                 return new List<PendingAssignmentDto>();
             }
 
-            // Convert to DTOs and return - all pending orders are shown for assignment
+            // Map to DTOs - business logic already applied by database
             var result = pendingOrders.Select(order => new PendingAssignmentDto
             {
                 OrderId = order.OrderId,
@@ -215,9 +172,9 @@ public class OrderService : IOrderService
                 PaymentMethod = order.PaymentMethod ?? "COD",
                 OrderDate = order.OrderDate,
                 Status = order.Status ?? "Pending",
-                DeliveryId = null, // No delivery record yet
-                DeliveryStatus = null, // No delivery yet
-                RiderId = null, // Not assigned yet
+                DeliveryId = null,
+                DeliveryStatus = null,
+                RiderId = null,
                 RiderName = null,
                 PendingReason = "Awaiting rider assignment"
             }).ToList();
@@ -234,12 +191,62 @@ public class OrderService : IOrderService
             throw;
         }
     }
-    
-    // Removed the broken code that depends on DeliveryServiceDB schema
-    // The old implementation was:
-    // - Step 2: Get all delivery records from DeliveryServiceDB to check assignment status
-    // - Step 3: Identify orders that have ACTIVE assignments (should be excluded)
-    // - Step 4: Build the result - orders that are NOT actively assigned
-    // This failed because the Delivery table schema doesn't match the EF model
-    
+
+    /// <summary>
+    /// Update order status via sp_Order_UpdateStatus stored procedure.
+    /// Business rules enforced by database:
+    /// - Valid status transitions only
+    /// </summary>
+    public async Task<Order?> UpdateOrderStatusAsync(int orderId, string newStatus)
+    {
+        var (order, resultCode, resultMessage) = await _context.SpOrderUpdateStatusAsync(orderId, newStatus);
+
+        if (resultCode != 0)
+        {
+            _logger.LogWarning("Failed to update order status: {ResultMessage}", resultMessage);
+            return null;
+        }
+
+        _logger.LogInformation("Order {OrderId} status updated to {Status}", orderId, newStatus);
+        return order;
+    }
+
+    private static void WriteDebugLog(string hypothesisId, string location, string message, object data)
+    {
+        try
+        {
+            var payload = new
+            {
+                sessionId = "debug-session",
+                runId = "run1",
+                hypothesisId,
+                location,
+                message,
+                data,
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            };
+            var logPath = @"c:\Users\Ideapad\OneDrive\Desktop\WEBDEV\.cursor\debug.log";
+            var logDir = Path.GetDirectoryName(logPath);
+
+            if (!string.IsNullOrWhiteSpace(logDir) && !File.Exists(logDir))
+            {
+                Directory.CreateDirectory(logDir);
+                File.AppendAllText(logPath, JsonSerializer.Serialize(payload) + Environment.NewLine);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(logDir) && Directory.Exists(logDir))
+            {
+                File.AppendAllText(logPath, JsonSerializer.Serialize(payload) + Environment.NewLine);
+                return;
+            }
+
+            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            _ = LogClient.PostAsync(LogEndpoint, content);
+        }
+        catch
+        {
+            // Swallow logging errors to avoid breaking order flow.
+        }
+    }
 }

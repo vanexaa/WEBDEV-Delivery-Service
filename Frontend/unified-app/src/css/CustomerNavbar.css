@@ -1,0 +1,86 @@
+/* ===============================
+   Kapebara – Customer Navbar
+   =============================== */
+
+.kapebara-navbar {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(59, 48, 42, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 2000;
+}
+
+.kapebara-navbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+}
+
+/* BRAND */
+.kapebara-logo {
+  font-family: "DM Sans", sans-serif;
+  font-weight: 800;
+  font-size: 1.3rem;
+  color: #3B302A;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+
+/* CENTER LINKS */
+.kapebara-nav-links {
+  display: flex;
+  gap: 32px;
+}
+
+.kapebara-nav-links .nav-link {
+  font-family: "DM Sans", sans-serif;
+  font-weight: 600;
+  color: #1C1C1C;
+  text-decoration: none;
+  position: relative;
+}
+
+/* ACTIVE UNDERLINE */
+.kapebara-nav-links .nav-link.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 100%;
+  height: 2px;
+  background-color: #3B302A;
+}
+
+/* RIGHT */
+.kapebara-nav-icons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-name {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 0.9rem;
+  color: #757575;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: #1C1C1C;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .kapebara-nav-links {
+    display: none;
+  }
+
+  .hidden-mobile {
+    display: none;
+  }
+}

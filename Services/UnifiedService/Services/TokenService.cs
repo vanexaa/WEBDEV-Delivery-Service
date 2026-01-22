@@ -63,6 +63,12 @@ public class TokenService : ITokenService
 
     public ClaimsPrincipal? ValidateToken(string token)
     {
+        var result = ValidateTokenWithDetails(token);
+        return result.Principal;
+    }
+
+    public TokenValidationResult ValidateTokenWithDetails(string token)
+    {
         try
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
@@ -86,12 +92,63 @@ public class TokenService : ITokenService
             };
 
             var principal = tokenHandler.ValidateToken(token, validationParameters, out SecurityToken validatedToken);
-            return principal;
+            return new TokenValidationResult
+            {
+                IsValid = true,
+                Principal = principal,
+                IsExpired = false
+            };
+        }
+        catch (SecurityTokenExpiredException ex)
+        {
+            _logger.LogWarning("Token expired: ValidTo={ValidTo}, CurrentTime={CurrentTime}", 
+                ex.Expires, DateTime.UtcNow);
+            return new TokenValidationResult
+            {
+                IsValid = false,
+                IsExpired = true,
+                ErrorMessage = "Token has expired. Please login again or use refresh token."
+            };
+        }
+        catch (SecurityTokenInvalidSignatureException)
+        {
+            _logger.LogWarning("Token has invalid signature");
+            return new TokenValidationResult
+            {
+                IsValid = false,
+                IsExpired = false,
+                ErrorMessage = "Token signature is invalid."
+            };
+        }
+        catch (SecurityTokenInvalidIssuerException)
+        {
+            _logger.LogWarning("Token has invalid issuer");
+            return new TokenValidationResult
+            {
+                IsValid = false,
+                IsExpired = false,
+                ErrorMessage = "Token issuer is invalid."
+            };
+        }
+        catch (SecurityTokenInvalidAudienceException)
+        {
+            _logger.LogWarning("Token has invalid audience");
+            return new TokenValidationResult
+            {
+                IsValid = false,
+                IsExpired = false,
+                ErrorMessage = "Token audience is invalid."
+            };
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Token validation failed");
-            return null;
+            _logger.LogWarning(ex, "Token validation failed: {Message}", ex.Message);
+            return new TokenValidationResult
+            {
+                IsValid = false,
+                IsExpired = false,
+                ErrorMessage = "Token validation failed."
+            };
         }
     }
 

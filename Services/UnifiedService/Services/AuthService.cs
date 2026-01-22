@@ -1,10 +1,22 @@
-using Microsoft.EntityFrameworkCore;
+/*
+ * Database-First Architecture - Auth Service Implementation
+ * 
+ * ARCHITECTURAL RULES ENFORCED:
+ * - ALL data access through stored procedures only
+ * - NO LINQ queries against DbSets
+ * - NO Add/Update/Remove/SaveChanges (except via SP wrappers)
+ * - Service layer only executes SPs and interprets results
+ */
 using AuthService.Data;
 using AuthService.Models;
 using BCrypt.Net;
 
 namespace AuthService.Services;
 
+/// <summary>
+/// Auth service - executes stored procedures for authentication operations.
+/// All business rules (user validation, token management) enforced by database.
+/// </summary>
 public class AuthService : IAuthService
 {
     private readonly AuthDbContext _context;
@@ -24,6 +36,10 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Login user via sp_Auth_Login stored procedure.
+    /// Password verification done in service layer (BCrypt).
+    /// </summary>
     public async Task<LoginResponse?> LoginAsync(LoginRequest request)
     {
         try
@@ -35,9 +51,12 @@ public class AuthService : IAuthService
                 return null;
             }
 
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u =>
-                    u.Username == identifier || u.Email == identifier);
+            // Get user via stored procedure
+            var user = await _context.SpAuthLoginAsync(identifier);
+
+            _logger.LogInformation("Login lookup for {Identifier}: user {UserStatus}",
+                identifier,
+                user == null ? "NOT FOUND" : "FOUND");
 
             if (user == null)
             {
@@ -51,9 +70,11 @@ public class AuthService : IAuthService
                 return null;
             }
 
-            // Verify password using BCrypt - trim hash to remove any accidental padding
-            var storedHash = user.PasswordHash?.Trim();
-            var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, storedHash);
+            // Verify password using BCrypt (done in service layer, not DB)
+            var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            _logger.LogInformation("Password verification for {Identifier}: {PasswordStatus}",
+                identifier,
+                passwordValid ? "PASSED" : "FAILED");
 
             if (!passwordValid)
             {
@@ -66,19 +87,10 @@ public class AuthService : IAuthService
 
             // Generate refresh token
             var refreshToken = _tokenService.GenerateRefreshToken();
-            var refreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+            var refreshTokenExpiry = DateTime.UtcNow.AddDays(7); // Refresh token valid for 7 days
 
-            // Save refresh token
-            var refreshTokenEntity = new RefreshToken
-            {
-                UserId = user.UserId,
-                Token = refreshToken,
-                ExpiresAt = refreshTokenExpiry,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.RefreshTokens.Add(refreshTokenEntity);
-            await _context.SaveChangesAsync();
+            // Save refresh token via stored procedure
+            await _context.SpAuthSaveRefreshTokenAsync(user.UserId, refreshToken, refreshTokenExpiry);
 
             // Calculate token expiry
             var jwtSettings = _configuration.GetSection("JwtSettings");
@@ -108,14 +120,19 @@ public class AuthService : IAuthService
         }
     }
 
+    /// <summary>
+    /// Get user by ID via sp_Auth_GetUserById stored procedure.
+    /// </summary>
     public async Task<User?> GetUserByIdAsync(int userId)
     {
-        return await _context.Users.FindAsync(userId);
+        return await _context.SpAuthGetUserByIdAsync(userId);
     }
 
+    /// <summary>
+    /// Get user by username via sp_Auth_GetUserByUsername stored procedure.
+    /// </summary>
     public async Task<User?> GetUserByUsernameAsync(string username)
     {
-        return await _context.Users
-            .FirstOrDefaultAsync(u => u.Username == username);
+        return await _context.SpAuthGetUserByUsernameAsync(username);
     }
 }

@@ -54,99 +54,136 @@ const LoginPage = () => {
   };
 
   return (
+  <div style={{
+    backgroundColor: '#F7F5F2', // light coffee background
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '24px'
+  }}>
     <div style={{
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px'
+      background: '#FFFFFF',
+      borderRadius: '16px',
+      boxShadow: '0 12px 30px rgba(59, 48, 42, 0.12)',
+      padding: '40px',
+      maxWidth: '420px',
+      width: '100%',
+      border: '1px solid rgba(59,48,42,0.08)'
     }}>
-      <div style={{
-        background: 'white',
-        borderRadius: '15px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-        padding: '40px',
-        maxWidth: '400px',
-        width: '100%'
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h2><i className="bi bi-box-arrow-in-right"></i> Login</h2>
-          <p style={{ color: '#666', margin: 0 }}>Delivery Service</p>
-        </div>
+      
+      {/* HEADER */}
+      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <h2 style={{
+          fontWeight: 700,
+          color: '#3B302A',
+          marginBottom: '6px'
+        }}>
+          Welcome to Kapebara
+        </h2>
+        <p style={{
+          color: '#7A6E66',
+          margin: 0,
+          fontSize: '0.95rem'
+        }}>
+          Delivery Service Login
+        </p>
+      </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label htmlFor="username" className="form-label">Username</label>
-            <input
-              type="text"
-              className="form-control"
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="mb-3">
-            <label htmlFor="password" className="form-label">Password</label>
-            <input
-              type="password"
-              className="form-control"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          {error && (
-            <div className="alert alert-danger" role="alert">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="btn btn-primary w-100"
+      {/* FORM */}
+      <form onSubmit={handleSubmit}>
+        <div className="mb-3">
+          <label className="form-label" style={{ color: '#3B302A', fontWeight: 600 }}>
+            Username
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
             disabled={loading}
             style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              border: 'none',
               padding: '12px',
-              fontWeight: '600',
-              borderRadius: '8px'
+              borderRadius: '10px',
+              borderColor: 'rgba(59,48,42,0.2)'
             }}
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
+          />
+        </div>
 
-        <div style={{
-          background: '#f8f9fa',
-          borderRadius: '8px',
-          padding: '15px',
-          marginTop: '20px',
-          fontSize: '0.9rem'
+        <div className="mb-3">
+          <label className="form-label" style={{ color: '#3B302A', fontWeight: 600 }}>
+            Password
+          </label>
+          <input
+            type="password"
+            className="form-control"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            style={{
+              padding: '12px',
+              borderRadius: '10px',
+              borderColor: 'rgba(59,48,42,0.2)'
+            }}
+          />
+        </div>
+
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
+          </div>
+        )}
+
+        {/* LOGIN BUTTON */}
+        <button
+          type="submit"
+          className="btn w-100"
+          disabled={loading}
+          style={{
+            backgroundColor: '#3B302A',
+            color: '#FFFFFF',
+            padding: '12px',
+            fontWeight: 600,
+            borderRadius: '12px',
+            border: 'none'
+          }}
+        >
+          {loading ? 'Logging in…' : 'Login'}
+        </button>
+      </form>
+
+      {/* TEST CREDENTIALS */}
+      <div style={{
+        background: '#FAF9F7',
+        borderRadius: '12px',
+        padding: '16px',
+        marginTop: '24px',
+        fontSize: '0.85rem',
+        border: '1px dashed rgba(59,48,42,0.15)'
+      }}>
+        <h6 style={{
+          color: '#3B302A',
+          marginBottom: '10px',
+          fontWeight: 700
         }}>
-          <h6 style={{ color: '#495057', marginBottom: '10px', fontWeight: '600' }}>
-            Test Credentials:
-          </h6>
-          <div style={{ margin: '5px 0', color: '#666' }}>
-            <strong>Admin:</strong> admin / password123
-          </div>
-          <div style={{ margin: '5px 0', color: '#666' }}>
-            <strong>Rider:</strong> rider1 / password123
-          </div>
-          <div style={{ margin: '5px 0', color: '#666' }}>
-            <strong>Customer:</strong> customer1 / password123
-          </div>
+          Test Credentials
+        </h6>
+
+        <div style={{ color: '#6E625A', marginBottom: '6px' }}>
+          <strong>Admin:</strong> admin / password123
+        </div>
+        <div style={{ color: '#6E625A', marginBottom: '6px' }}>
+          <strong>Rider:</strong> rider1 / password123
+        </div>
+        <div style={{ color: '#6E625A' }}>
+          <strong>Customer:</strong> customer1 / password123
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default LoginPage;

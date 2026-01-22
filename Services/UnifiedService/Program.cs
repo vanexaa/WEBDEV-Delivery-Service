@@ -311,26 +311,6 @@ using (var scope = app.Services.CreateScope())
     {
         logger.LogError(ex, "Error initializing Customer database");
     }
-    
-    // Seed mock delivery data for development/testing
-    // NOTE: This seeds mock data into the database. In production, replace this with real data.
-    // Data flow: Database (seeded) → Service → Controller → Frontend
-    try
-    {
-        var deliveryContext = services.GetRequiredService<DeliveryDbContext>();
-        var orderContext = services.GetRequiredService<OrderDbContext>();
-        var riderContext = services.GetRequiredService<RiderDbContext>();
-        
-        await DeliveryService.Data.DatabaseSeeder.SeedMockDeliveryDataAsync(
-            deliveryContext,
-            orderContext,
-            riderContext,
-            logger);
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Error seeding mock delivery data. Application will continue without seed data.");
-    }
 }
 
 // Configure the HTTP request pipeline
@@ -344,7 +324,12 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// Only use HTTPS redirection in production or when HTTPS is configured
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();

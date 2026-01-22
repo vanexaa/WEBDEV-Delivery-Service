@@ -339,27 +339,13 @@ public class RidersController : ControllerBase
     {
         try
         {
-            // Validate riderId parameter
-            if (riderId <= 0)
-            {
-                _logger.LogWarning("Invalid riderId provided: {RiderId}", riderId);
-                return BadRequest(new { message = "Invalid rider ID. RiderId must be greater than 0." });
-            }
-
-            _logger.LogInformation("GetRiderHistory called: RiderId={RiderId}, StartDate={StartDate}, EndDate={EndDate}", 
-                riderId, startDate, endDate);
-
             var deliveryHistory = await _riderService.GetRiderDeliveryHistoryAsync(riderId, startDate, endDate);
-            
-            _logger.LogInformation("GetRiderHistory completed: RiderId={RiderId}, Count={Count}", 
-                riderId, deliveryHistory?.Count ?? 0);
-            
-            return Ok(deliveryHistory ?? new List<RiderOrderDto>());
+            return Ok(deliveryHistory);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting rider history for RiderId={RiderId}: {Message}", riderId, ex.Message);
-            return StatusCode(500, new { message = "An error occurred while retrieving delivery history", error = ex.Message });
+            _logger.LogError(ex, "Error getting rider history");
+            return StatusCode(500, new { message = "An error occurred" });
         }
     }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { deliveryService, riderService } from '../../services/api';
-import Navbar from '../../components/Navbar';
+import Navbar from '../../components/AdminNavbar';
 import '../../App.css';
 
 const DeliveriesPage = () => {
