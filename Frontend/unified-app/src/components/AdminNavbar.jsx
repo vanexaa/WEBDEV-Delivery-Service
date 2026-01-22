@@ -56,6 +56,19 @@ const Navbar = () => {
             <i className="bi bi-bell"></i>
           </button>
 
+          {/* LOGOUT (DESKTOP) */}
+          <button className="icon-btn hidden-mobile" onClick={handleLogout}>
+            <i className="bi bi-box-arrow-right"></i>
+          </button>
+
+          {/* MOBILE MENU BUTTON */}
+          <button
+            className="icon-btn mobile-menu-btn"
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+          >
+            <i className="bi bi-list"></i>
+          </button>
+
           <div className="profile-menu">
             <button
               className="icon-btn"
