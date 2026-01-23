@@ -299,7 +299,7 @@ const OrderDetailsPage = () => {
                 <div className="row mb-3">
                   <div className="col-md-6">
                     <h6 className="text-muted">Order Total</h6>
-                    <p className="fs-5 fw-bold">${order.orderTotal.toFixed(2)}</p>
+                    <p className="fs-5 fw-bold">₱{order.orderTotal.toFixed(2)}</p>
                   </div>
                   <div className="col-md-6">
                     <h6 className="text-muted">Payment Method</h6>

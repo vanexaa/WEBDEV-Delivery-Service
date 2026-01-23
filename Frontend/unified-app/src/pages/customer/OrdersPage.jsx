@@ -233,7 +233,7 @@ const OrdersPage = () => {
                             </small>
                           </td>
                           <td>
-                            <strong>${parseFloat(orderTotal || 0).toFixed(2)}</strong>
+                            <strong>₱{parseFloat(orderTotal || 0).toFixed(2)}</strong>
                           </td>
                           <td>
                             <span className="badge bg-secondary">
@@ -330,7 +330,7 @@ const OrdersPage = () => {
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Order Total *</label>
                       <div className="input-group">
-                        <span className="input-group-text">$</span>
+                        <span className="input-group-text">₱</span>
                         <input
                           type="number"
                           step="0.01"
@@ -485,7 +485,7 @@ const OrdersPage = () => {
                     <strong>Order Total:</strong>
                     <p>
                       <strong className="text-success fs-5">
-                        ${parseFloat(
+                        ₱{parseFloat(
                           selectedOrder.orderTotal || selectedOrder.OrderTotal || 0
                         ).toFixed(2)}
                       </strong>
@@ -496,12 +496,7 @@ const OrdersPage = () => {
                     <p>{formatDate(selectedOrder.orderDate || selectedOrder.OrderDate)}</p>
                   </div>
                 </div>
-                <div className="mt-4">
-                  <h6>Raw API Response (for debugging):</h6>
-                  <pre className="bg-light p-3 rounded" style={{ fontSize: '0.8rem' }}>
-                    {JSON.stringify(selectedOrder, null, 2)}
-                  </pre>
-                </div>
+                
               </div>
               <div className="modal-footer">
                 <button

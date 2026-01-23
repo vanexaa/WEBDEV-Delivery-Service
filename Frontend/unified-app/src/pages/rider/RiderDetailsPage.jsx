@@ -245,17 +245,9 @@ const RiderDetailsPage = () => {
                       </div>
                     )}
 
-                    {riderProfile?.totalEarnings !== undefined && (
-                      <div className="mb-2">
-                        <strong><i className="bi bi-currency-dollar"></i> Total Earnings:</strong>
-                        <div className="ms-3">
-                          ${(riderProfile.totalEarnings || riderProfile.TotalEarnings || 0).toFixed(2)}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
-              </div>
+              </div> 
 
               {/* Location Card */}
               <div className="col-md-6 mb-4">

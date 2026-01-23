@@ -142,12 +142,12 @@ const ProfilePage = () => {
       <div className="container-fluid page-container">
         <div className="row">
           <div className="col-12">
-            <h4 className="mb-4">Rider Profile</h4>
+            <h4 className="px-4">Rider Profile</h4>
           </div>
         </div>
 
         <div className="row">
-          <div className="col-md-6 mb-4">
+          <div className="md-6">
             <div className="card">
               <div className="card-header bg-primary text-white">
                 <h5 className="mb-0">Personal Information</h5>
@@ -183,25 +183,7 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          <div className="col-md-6 mb-4">
-            <div className="card">
-              <div className="card-header bg-success text-white">
-                <h5 className="mb-0">Statistics</h5>
-              </div>
-              <div className="card-body">
-                <div className="mb-3">
-                  <h6 className="text-muted">Total Deliveries</h6>
-                  <p className="fs-3 fw-bold">{profile.totalDeliveries || profile.TotalDeliveries || 0}</p>
-                </div>
-                <div className="mb-3">
-                  <h6 className="text-muted">Total Earnings</h6>
-                  <p className="fs-3 fw-bold text-success">
-                    ${(profile.totalEarnings || profile.TotalEarnings || 0).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          
         </div>
       </div>
     </>

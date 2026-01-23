@@ -338,7 +338,7 @@ const CustomerOrdersPage = () => {
 
                         <div className="mb-3">
                           <p className="mb-1">
-                            <strong>Total:</strong> ${parseFloat(orderTotal || 0).toFixed(2)}
+                            <strong>Total:</strong> ₱{parseFloat(orderTotal || 0).toFixed(2)}
                           </p>
                           <p className="mb-1 text-muted small">
                             <i className="bi bi-geo-alt"></i>{' '}
@@ -451,7 +451,7 @@ const CustomerOrdersPage = () => {
                   <div className="col-md-6">
                     <strong>Order Total:</strong>
                     <p className="fs-5 text-success">
-                      <strong>${parseFloat(
+                      <strong>₱{parseFloat(
                         selectedOrder.orderTotal || selectedOrder.OrderTotal || 0
                       ).toFixed(2)}</strong>
                     </p>
@@ -488,14 +488,14 @@ const CustomerOrdersPage = () => {
                 )}
 
                 {/* Raw JSON for debugging */}
-                <details className="mt-4">
+                {/*<details className="mt-4">
                   <summary className="cursor-pointer text-muted">
                     <small>Debug: View Raw API Response</small>
                   </summary>
                   <pre className="bg-light p-3 rounded mt-2" style={{ fontSize: '0.75rem', maxHeight: '200px', overflow: 'auto' }}>
                     {JSON.stringify(selectedOrder, null, 2)}
                   </pre>
-                </details>
+                </details>*/}
               </div>
               <div className="modal-footer">
                 <button

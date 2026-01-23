@@ -644,48 +644,8 @@ const DashboardPage = () => {
                         )}
                         {(order.status === 'Assigned' || order.status === 'assigned') && (
                           <div className="d-grid gap-2 mt-3">
-                            <button
-                              className="btn btn-success btn-sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const orderId = order.orderId || order.id || parseInt(order.transactionCode?.replace('ORD-', '') || '0');
-                                console.log('[DashboardPage] Accept button clicked for order:', {
-                                  order,
-                                  extractedOrderId: orderId
-                                });
-                                if (orderId && orderId > 0) {
-                                  handleAcceptOrder(orderId);
-                                } else {
-                                  alert('Unable to determine order ID. Please refresh and try again.');
-                                  console.error('[DashboardPage] Invalid orderId extracted:', orderId);
-                                }
-                              }}
-                              title="Accept this order"
-                            >
-                              <i className="bi bi-check-circle"></i> Accept Order
-                            </button>
-                            <button
-                              className="btn btn-danger btn-sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const orderId = order.orderId || order.id || parseInt(order.transactionCode?.replace('ORD-', '') || '0');
-                                console.log('[DashboardPage] Reject button clicked for order:', {
-                                  order,
-                                  extractedOrderId: orderId
-                                });
-                                if (orderId && orderId > 0) {
-                                  handleRejectOrder(orderId);
-                                } else {
-                                  alert('Unable to determine order ID. Please refresh and try again.');
-                                  console.error('[DashboardPage] Invalid orderId extracted:', orderId);
-                                }
-                              }}
-                              title="Reject this order (will be reassigned to another rider)"
-                            >
-                              <i className="bi bi-x-circle"></i> Reject Order
-                            </button>
+                            
+                            
                           </div>
                         )}
                         {(order.status !== 'Assigned' && order.status !== 'assigned') && (

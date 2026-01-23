@@ -44,9 +44,10 @@ const Navbar = () => {
           <Link className={`nav-link ${isActive('/admin/deliveries')}`} to="/admin/deliveries">
                 Deliveries
               </Link>
-          <Link className={`nav-link ${isActive('/admin/history')}`} to="/admin/history">
+          
+         {/* <Link className={`nav-link ${isActive('/admin/history')}`} to="/admin/history">
                 History
-              </Link>
+              </Link> */}
             
         </div>  
 
